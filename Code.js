@@ -56,7 +56,7 @@ const TEMPLATE = {
     style:LABEL_STYLE}},
   previous_balance:{
     label:{cell:[13,4], value:"SOLD LUNA/ZIUA PRECEDENTA"},
-    target:{cell:[13,4]}},
+    target:{cell:[13,5]}},
   record:{
     data:{
       target:{cell:[14,1]},
@@ -107,17 +107,17 @@ const [[companyAlias]] = interface.getSheetValues(8,2,1,1);
 const [[fromDate, toDate]] = interface.getSheetValues(8,3,1,2);
 const [fromDateStr, toDateStr] = [fromDate.toJSON(), toDate.toJSON()];
 
-// data source sheet coresponds with chosen company alias from drop-down
+// data source sheet corresponds with chosen company alias from drop-down
 const srcRawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SUFFIX);
 /*
  * should be something like this:
  * const reports = new Reports(fromDate, toDate, company, dataRecords);
  * reports.render(repSprSheet);
- * Insire reports would be something like:
+ * Inside reports would be something like:
  * const dayReport = new DailyReport(...);
  * for each date:
  * 	dayReport.render(toSheet);
- * 
+ */ 
 //-----------------------------------------------------------------
 renderReport(repSprSheet, srcRawDataSheet, fromDateStr, toDateStr);
 //-----------------------------------------------------------------
@@ -232,17 +232,33 @@ class Element {
       toSheet.getRange(...template._layoutRange).clear();
 
       const leafKeys = ['label', 'target'];
-      // a {Map} tree having {Element} leaves
-      const elementsTree = objToMap(template, leafKeys);
+      /**
+       * {Map} tree - having {Element} leaves
+       * {Map} elements - having key=keyFromCell(x,y), and value is {Element} leaf 
+       */
+      const [tree, elements] = objToMap(template, leafKeys);
+      log(elements.get(keyFromCell(13,4)).value);
+      //
+      //render all elements that have a value
+      for (const [key, element] of elements){
+        if (element.value)
+          element.render(toSheet) && log('rendered cell: '+key);
+      }
+
       
   `previous_balance:{
     label:{cell:[13,4], value:"SOLD LUNA/ZIUA PRECEDENTA"},
-    target:{cell:[13,4]}},
+    target:{cell:[13,5]}},
   record:{
     data:{
       target:{cell:[14,1]},
     },`
-      log(elementsTree.get('record').get('data').get('target').cell);
+
+      tree.get('companyName').get('target').value = company.get('name');
+      tree.get('tax_id').get('target').value = company.get('tax_id');
+      tree.get('reg_num').get('target').value = company.get('reg_num');
+
+      log(tree.get('record').get('data').get('target').cell);
         
       log(`DailyReport rendered to sheet ${toSheet.getName()}`);
       
@@ -270,31 +286,54 @@ return;
  * 
  * @param {Object} obj - JSON-like object
  * @param {Array} leafKeys - array of {string}, keys in obj that stores leaves 
- * @returns {Map} mapTree - a tree of {Map} instances, having {Element} leaves 
+ * @returns {Array} [mapTree, leaves] - 
+ *   {Map} mapTree - a tree of {Map} instances, having {Element} leaves 
+ *   {Map} leaves - reference to every leaf, having keys {Array} [x,y],
+ *   that corresponds to 'cell' property of {Element}
  */
 
-function objToMap(obj, leafKeys){
+function objToMap(obj, leafKeys, leaves=new Map()){
 
   const mapTree = new Map();
 
   for (const key in obj){
     
     if (leafKeys.includes(key)){
-      mapTree.set(key, new Element(obj[key]));
+      // if is a leaf
+      const element = new Element(obj[key]);
+      mapTree.set(key, element);
+      const [x, y] = obj[key].cell;
+      leaves.set(keyFromCell(x, y), element); 
     } 
     // does not recurses on arrays; are passed over
     else if (isObject(obj[key])){
-      const subTree = objToMap(obj[key], leafKeys);
+      const [subTree, _leaves]  = objToMap(obj[key], leafKeys, leaves);
       mapTree.set(key, subTree);
     }
       
   }
-  return mapTree;
+  return [mapTree, leaves]
 }
 
 } // renderReport 
 
 // -----------------------Global functions------------------------
+
+/**
+ * Converts tuple array like [1, 2] into {string} key '1:2'
+ */
+function keyFromCell(x, y){
+  const key = `${x}:${y}`;
+  return key;
+}
+
+/**
+ * Converts {string} key (e.g. '1:2') into tuple array (e.g. [1, 2])
+ */
+function cellFromKey(key){
+  const tuple = key.split(':').map(letter=>+letter);
+  return tuple // cell 
+}
 
 function getCompanies(sheet, records=10, fields=4){
   const companies = new Map();
