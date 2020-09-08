@@ -1,6 +1,7 @@
 
 /**
  * Main function, call from sheet button, where it is assigned
+ * This function is considered global
  */
 function makeReport() {
 
@@ -108,7 +109,15 @@ const [fromDateStr, toDateStr] = [fromDate.toJSON(), toDate.toJSON()];
 
 // data source sheet coresponds with chosen company alias from drop-down
 const srcRawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SUFFIX);
-
+/*
+ * should be something like this:
+ * const reports = new Reports(fromDate, toDate, company, dataRecords);
+ * reports.render(repSprSheet);
+ * Insire reports would be something like:
+ * const dayReport = new DailyReport(...);
+ * for each date:
+ * 	dayReport.render(toSheet);
+ * 
 //-----------------------------------------------------------------
 renderReport(repSprSheet, srcRawDataSheet, fromDateStr, toDateStr);
 //-----------------------------------------------------------------
