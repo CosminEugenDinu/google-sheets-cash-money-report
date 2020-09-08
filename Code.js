@@ -1,4 +1,8 @@
 
+/**
+ * Main function, call from sheet button, where it is assigned
+ */
+function makeReport() {
 
 // global settings variables
 const REPORT_GENERATOR_SPREADSHEET_ID = "1nDNPcpgP9TlAcTSKASwFxuQQswdAI7Wm3I8Z-7rSGnE";
@@ -51,16 +55,25 @@ const TEMPLATE = {
     style:LABEL_STYLE}},
   previous_balance:{
     label:{cell:[13,4], value:"SOLD LUNA/ZIUA PRECEDENTA"},
-    target:{cell:[13,4]},
+    target:{cell:[13,4]}},
+  record:{
+    data:{
+      target:{cell:[14,1]},
+    },
+    ref:{
+      target:{cell:[14,2]},
+    },
+    doc_type:{
+      target:{cell:[14,3]},
+    }},
   total:{
     label:{cell:[15,4],value:"Total la data de {}:"},
   day_balance:{
     label:{cell:[15,5],value:"Sold la data de {}:"},
+  }}
 };
 
 
-
-function makeReport() {
 // instantiate log function
 const log = Log(REPORT_GENERATOR_SPREADSHEET_ID, 0, [10,5]);
 log("makeReport procedure begin...");
@@ -81,6 +94,8 @@ const rawDataSheets = repGenSprSheet.getSheets().filter(
   // get all sheets except Interface and settings
   return (sheetName !== INTERFACE_SHEET_NAME) && (sheetName !== SETTINGS_SHEET_NAME);
 });
+
+
   
 // if company alias name was changed in settings
 updateRawDataSheetNames(rawDataSheets, computedRawDataSheetNames);
@@ -101,53 +116,61 @@ renderReport(repSprSheet, srcRawDataSheet, fromDateStr, toDateStr);
 
 // ------ library -----------------------------------------------------------------
 
-
 function renderReport(toSpreadsheet, srcRawDataSheet, fromDateStr, toDateStr){
 
-  class Element {
+class Element {
 
-    /**
-     * @param {Object} elem - a TEMPLATE property exept those begining with "_"
-     */
-    constructor(elem){
-      const instanceProps = ['cell', 'offset', 'value', 'style'];
-      for (const p of instanceProps) this[p] = null;
-      if (elem) for (const prop of instanceProps)
-        if (elem.hasOwnProperty(prop)) this[prop] = elem[prop];
-    }
-
-    setProperty(range, property, value){
-      const properties = new Map();
-      properties.set("background", ()=>range.setBackground(value));
-      properties.set("borders", ()=>range.setBorder(...value));
-      properties.set("fontSize", ()=>range.setFontSize(value));
-      properties.set("fontColor", ()=>range.setFontColor(value));
-      properties.set("fontWeight", ()=>range.setFontWeight(value));
-      properties.set("horizontalAlignment", ()=>range.setHorizontalAlignment(value));
-      properties.set("verticalAlignment", ()=>range.setVerticalAlignment(value));
-      
-      // set property on range object
-      properties.get(property)();
-    }
-
-    render(sheet){
-      if (!this.cell) throw new Error("Cannot render element if no cell");
-      const range = sheet.getRange(...this.cell);
-      if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
-      const cell = range.getCell(1,1);
-      //cell.setValue(this.value);
-      range.setValue(this.value);
-
-      for (const prop in this.style)
-        this.setProperty(range, prop, this.style[prop]);
-
-      return range
-    }
-
-
+  /**
+   * @param {Object} elem - a TEMPLATE property except those beginning with "_"
+   */
+  constructor(elem){
+    const instanceProps = ['cell', 'offset', 'value', 'style'];
+    for (const p of instanceProps) this[p] = null;
+    if (elem) for (const prop of instanceProps)
+      if (elem.hasOwnProperty(prop)) this[prop] = elem[prop];
   }
 
-  
+  /**
+   * Sets properties on range objects (e.g. set borders on cells in sheet)
+   *
+   * @param {Range} range - instance returned by sheet.getRange(x, y, ...)
+   * @param {string} property - key in {Map} properties (a local variable)
+   * @param {string|Number|Array} value - required by a range method
+   */
+  setProperty(range, property, value){
+    const properties = new Map();
+    properties.set("background", ()=>range.setBackground(value));
+    properties.set("borders", ()=>range.setBorder(...value));
+    properties.set("fontSize", ()=>range.setFontSize(value));
+    properties.set("fontColor", ()=>range.setFontColor(value));
+    properties.set("fontWeight", ()=>range.setFontWeight(value));
+    properties.set("horizontalAlignment", ()=>range.setHorizontalAlignment(value));
+    properties.set("verticalAlignment", ()=>range.setVerticalAlignment(value));
+    
+    // set property on range object
+    properties.get(property)();
+  }
+
+  render(sheet){
+    if (!this.cell) throw new TypeError(`Cannot render element when element.cell=${cell}`);
+    const range = sheet.getRange(...this.cell);
+    if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
+    // const cell = range.getCell(1,1);
+    // cell.setValue(this.value);
+    range.setValue(this.value);
+
+    for (const prop in this.style)
+      this.setProperty(range, prop, this.style[prop]);
+
+    return range
+  }
+
+
+}
+
+  /**
+   * 
+   */
   class DailyReport {
     constructor(dayDate, company, dataValues){
       this.dateStr = dayDate;
@@ -160,7 +183,8 @@ function renderReport(toSpreadsheet, srcRawDataSheet, fromDateStr, toDateStr){
       widths.map((w, i) => sheet.setColumnWidth(i+1, w));
     }
 
-    render(toSheet, template){
+    _render(toSheet, template){
+      
       toSheet.setName(this.formatedDateStr);
       toSheet.getRange(...template._layoutRange).clear();
       // groups of elements 
@@ -184,16 +208,36 @@ function renderReport(toSpreadsheet, srcRawDataSheet, fromDateStr, toDateStr){
       groups.get('reg_num').get('target').value = company.get('reg_num');
       
       for (const [group, elemTypes] of groups){
-        for (const [type, element] of elemTypes){	
+        for (const [type, element] of elemTypes){ 
           element.render(toSheet);
         }
       }
-
+      
       log(`DailyReport rendered to sheet ${toSheet.getName()}`);
       
     }
-    
 
+    render(toSheet, template){
+      
+      toSheet.setName(this.formatedDateStr);
+      toSheet.getRange(...template._layoutRange).clear();
+
+      const leafKeys = ['label', 'target'];
+      // a {Map} tree having {Element} leaves
+      const elementsTree = objToMap(template, leafKeys);
+      
+  `previous_balance:{
+    label:{cell:[13,4], value:"SOLD LUNA/ZIUA PRECEDENTA"},
+    target:{cell:[13,4]}},
+  record:{
+    data:{
+      target:{cell:[14,1]},
+    },`
+      log(elementsTree.get('record').get('data').get('target').cell);
+        
+      log(`DailyReport rendered to sheet ${toSheet.getName()}`);
+      
+    }
   }
   
   
@@ -209,7 +253,39 @@ function renderReport(toSpreadsheet, srcRawDataSheet, fromDateStr, toDateStr){
 
 return;
   
+
+
+/**
+ * Algorithm to convert JSON-like object to tree of Map instances.
+ * Leaves are of type {Object}.
+ * 
+ * @param {Object} obj - JSON-like object
+ * @param {Array} leafKeys - array of {string}, keys in obj that stores leaves 
+ * @returns {Map} mapTree - a tree of {Map} instances, having {Element} leaves 
+ */
+
+function objToMap(obj, leafKeys){
+
+  const mapTree = new Map();
+
+  for (const key in obj){
+    
+    if (leafKeys.includes(key)){
+      mapTree.set(key, new Element(obj[key]));
+    } 
+    // does not recurses on arrays; are passed over
+    else if (isObject(obj[key])){
+      const subTree = objToMap(obj[key], leafKeys);
+      mapTree.set(key, subTree);
+    }
+      
+  }
+  return mapTree;
 }
+
+} // renderReport 
+
+// -----------------------Global functions------------------------
 
 function getCompanies(sheet, records=10, fields=4){
   const companies = new Map();
@@ -262,8 +338,6 @@ function updateRawDataSheetNames(rawDataSheets, computedNames){
         (sheet, i) => sheet.setName(computedNames[i])
       )
 }
-
-  
 function Log(spreadsheetId, sheetIndex, cellPos){
   const spreadSheet = SpreadsheetApp.openById(spreadsheetId);
   const sheet = spreadSheet.getSheets()[sheetIndex];
@@ -281,9 +355,14 @@ function Log(spreadsheetId, sheetIndex, cellPos){
     logs.push(str);
     cell.setValue('> '+logs.join('\n> '));
   }
-	return log;
+  return log;
 }
 
 
+function isObject(type){
+  return typeof(type) === 'object' && type.constructor.name === 'Object';
 }
+
+
+} // makeReport
 
