@@ -17,61 +17,68 @@ const LABEL_STYLE = {fontSize:8, horizontalAlignment:'center', verticalAlignment
 const TEMPLATE = {
   _layoutRange:[1,1,50,6],
   _columnWidths:[75,80,20,250,80,80],
+  _rowHeight:15,
   companyName:{
-    label:{cell:[2,2], value:"Societatea",
+    label_element:{cell:[2,2], value:"Societatea",
       style:{fontSize:8, fontWeight:"bold", horizontalAlignment:'left'}},
-    target:{cell:[2,4]}},
+    target_element:{cell:[2,4]}},
   tax_id:{
-    label:{cell:[3,2], value:"CUI",
+    label_element:{cell:[3,2], value:"CUI",
       style:{fontSize:8, fontWeight:'bold', horizontalAlignment:'left'}},
-    target:{cell:[3,4],
+    target_element:{cell:[3,4],
       style:{horizontalAlignment:'left'}}},
   reg_num:{
-    label:{cell:[4,2], value:"Nr. Reg. Com.:", 
+    label_element:{cell:[4,2], value:"Nr. Reg. Com.:", 
       style:{fontSize:8, fontWeight:'bold', horizontalAlignment:'left'}},
-    target:{cell:[4,4]}},
+    target_element:{cell:[4,4]}},
   title:{
-    label:{cell:[8,2], value:"REGISTRUL DE CASA", offset:[2,4],
+    label_element:{cell:[8,2], value:"REGISTRUL DE CASA", offset:[2,4],
       style:{fontSize:12, fontWeight:'bold', horizontalAlignment:'center', verticalAlignment:'middle'}}},
   document:{
-    label:{cell:[11,1], value:"Document", offset:[1, 3],
+    label_element:{cell:[11,1], value:"Document", offset:[1, 3],
       style:LABEL_STYLE}},
   explanations:{
-    label:{cell:[11,4], value:"EXPLICATII", offset:[2,1],
+    label_element:{cell:[11,4], value:"EXPLICATII", offset:[2,1],
       style:LABEL_STYLE}},
   input:{
-    label:{cell:[11,5], value:"INCASARI", offset:[2,1],
+    label_element:{cell:[11,5], value:"INCASARI", offset:[2,1],
       style:LABEL_STYLE}},
   output:{
-    label:{cell:[11,6], value:"PLATI", offset:[2,1],
+    label_element:{cell:[11,6], value:"PLATI", offset:[2,1],
       style:LABEL_STYLE}},
   date:{
-    label:{cell:[12,1], value:"DATA",
+    label_element:{cell:[12,1], value:"DATA",
       style:LABEL_STYLE}},
   ref:{
-    label:{cell:[12,2], value: "NR",
+    label_element:{cell:[12,2], value: "NR",
       style:LABEL_STYLE}},
   doc_type:{
-    label:{cell:[12,3], value:"TIP",
+    label_element:{cell:[12,3], value:"TIP",
     style:LABEL_STYLE}},
   previous_balance:{
-    label:{cell:[13,4], value:"SOLD LUNA/ZIUA PRECEDENTA"},
-    target:{cell:[13,5]}},
+    label_element:{cell:[13,4], value:"SOLD LUNA/ZIUA PRECEDENTA"},
+    target_element:{cell:[13,5]}},
   record:{
     data:{
-      target:{cell:[14,1]},
+      target_element:{cell:[14,1]},
     },
     ref:{
-      target:{cell:[14,2]},
+      target_element:{cell:[14,2]},
     },
     doc_type:{
-      target:{cell:[14,3]},
+      target_element:{cell:[14,3]},
     }},
   total:{
-    label:{cell:[15,4],value:"Total la data de {}:"},
+    label_element:{cell:[15,4],value:"Total la data de {}:",
+      style:LABEL_STYLE}},
   day_balance:{
-    label:{cell:[15,5],value:"Sold la data de {}:"},
-  }}
+    label_element:{cell:[16,4],value:"Sold la data de {}:",
+      style:LABEL_STYLE}},
+  body:{
+    frame_element:{cell:[13,1], extent:[4,6],
+      style:{borders:[null, true, true, true, false, false]}},
+  },
+  
 };
 
 
@@ -105,7 +112,6 @@ updateRawDataSheetNames(rawDataSheets, computedRawDataSheetNames);
 const [[companyAlias]] = interface.getSheetValues(8,2,1,1);
 // user selects in interface
 const [[fromDate, toDate]] = interface.getSheetValues(8,3,1,2);
-const [fromDateStr, toDateStr] = [fromDate.toJSON(), toDate.toJSON()];
 
 // data source sheet corresponds with chosen company alias from drop-down
 const srcRawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SUFFIX);
@@ -119,24 +125,60 @@ const srcRawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET
  * 	dayReport.render(toSheet);
  */ 
 //-----------------------------------------------------------------
-renderReport(repSprSheet, srcRawDataSheet, fromDateStr, toDateStr);
+renderReport(repSprSheet, srcRawDataSheet, fromDate, toDate);
 //-----------------------------------------------------------------
 
 
 // ------ library -----------------------------------------------------------------
 
-function renderReport(toSpreadsheet, srcRawDataSheet, fromDateStr, toDateStr){
+function renderReport(toSpreadsheet, srcRawDataSheet, fromDate, toDate){
 
+/**
+ * Class Element - is a piece of sheet... (cell, range)
+ *
+ * Depending on type of parentKey (e.g. 'target_element', 'label_element', 'frame_element'),
+ * assigns specific properties (e.g. only element 'frame_element' has property 'extent')
+ * When render method is called, that element produces effect on target sheet,
+ * like setting a value in a cell or changing background color.
+ */
 class Element {
 
   /**
    * @param {Object} elem - a TEMPLATE property except those beginning with "_"
+   * @param {string} parentKey - key in {Map} tree where elem is stored
    */
-  constructor(elem){
-    const instanceProps = ['cell', 'offset', 'value', 'style'];
-    for (const p of instanceProps) this[p] = null;
-    if (elem) for (const prop of instanceProps)
-      if (elem.hasOwnProperty(prop)) this[prop] = elem[prop];
+  constructor(parentKey, elem){
+
+    const typesProps = Element._typesProps
+
+    if (!this.supportedTypes.includes(parentKey))
+      throw new TypeError(`${parentKey} is not a valid element type`+
+        `supported types are: ${this.supportedTypes}`);
+    this._type = parentKey;
+
+    for (const prop of Element._typesProps.get(parentKey))
+      this[prop] = null;
+    
+    for (const p in elem){
+      if (typesProps.get(this._type).includes(p)){
+        this[p] = elem[p];
+      } else {
+        throw new TypeError(`Property ${p} is not a supported by element type ${this._type}`);
+        }
+    }
+
+  }
+
+  get type(){
+    return this._type;
+  }
+
+  get supportedTypes(){
+    return Element._supportedTypes;
+  }
+
+  static getSupportedTypes(){
+    return Element._supportedTypes;
   }
 
   /**
@@ -146,7 +188,7 @@ class Element {
    * @param {string} property - key in {Map} properties (a local variable)
    * @param {string|Number|Array} value - required by a range method
    */
-  setProperty(range, property, value){
+  static setProperty(range, property, value){
     const properties = new Map();
     properties.set("background", ()=>range.setBackground(value));
     properties.set("borders", ()=>range.setBorder(...value));
@@ -162,28 +204,48 @@ class Element {
 
   render(sheet){
     if (!this.cell) throw new TypeError(`Cannot render element when element.cell=${cell}`);
-    const range = sheet.getRange(...this.cell);
-    if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
-    // const cell = range.getCell(1,1);
-    // cell.setValue(this.value);
-    range.setValue(this.value);
+
+    let range = sheet.getRange(...this.cell);
+    if (this.type === 'target_element'){
+      if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
+      range.setValue(this.value);
+    }
+    if (this.type === 'label_element'){
+      if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
+      range.setValue(this.value);
+    }
+    if (this.type === 'frame_element'){
+      if (this.extent) 
+        range = sheet.getRange(...this.cell, ...this.extent);
+    }
+      
 
     for (const prop in this.style)
-      this.setProperty(range, prop, this.style[prop]);
+      Element.setProperty(range, prop, this.style[prop]);
 
     return range
   }
 
-
 }
+// assign class static variables
+Element._typesProps = new Map();
+Element._typesProps.set('target_element',
+  ['cell', 'offset', 'value', 'style']);
+Element._typesProps.set('label_element',
+  ['cell', 'offset', 'value', 'style']);
+Element._typesProps.set('frame_element',
+  ['cell', 'extent', 'style']);
+Element._supportedTypes = Array.from(Element._typesProps.keys());
+
+
+
 
 /**
  * 
  */
 class DailyReport {
   constructor(dayDate, company, dataValues){
-    this.dateStr = dayDate;
-    this.formatedDateStr = dayDate.slice(0,10).split('-').reverse().join('/');
+    this.date = dayDate;
     this.company = company;
     this.values = dataValues;
   }
@@ -191,92 +253,55 @@ class DailyReport {
   setColumnWidths(sheet, widths){
     widths.map((w, i) => sheet.setColumnWidth(i+1, w));
   }
-
-  _render(toSheet, template){
-    
-    toSheet.setName(this.formatedDateStr);
-    toSheet.getRange(...template._layoutRange).clear();
-    // groups of elements 
-    const groups = new Map(); 
-    for (const entityKey in TEMPLATE){
-      if ( entityKey.charAt(0) === '_') continue;
-      // elemTypes could be label, target
-      const elemTypes = TEMPLATE[entityKey];
-      for (const elemType in elemTypes){
-        const element = new Element(elemTypes[elemType]);
-        if (groups.has(entityKey)){
-          groups.get(entityKey).set(elemType, element);
-        } else {
-          groups.set(entityKey, new Map().set(elemType, element));
-        }
-      }
-    }
-    // set dynamic values in target elements
-    groups.get('companyName').get('target').value = company.get('name');
-    groups.get('tax_id').get('target').value = company.get('tax_id');
-    groups.get('reg_num').get('target').value = company.get('reg_num');
-    
-    for (const [group, elemTypes] of groups){
-      for (const [type, element] of elemTypes){ 
-        element.render(toSheet);
-      }
-    }
-    
-    log(`DailyReport rendered to sheet ${toSheet.getName()}`);
-    
+  setRowsHeight(sheet, numRows, height){
+    sheet.setRowHeights(1, numRows, height);
   }
 
   render(toSheet, template){
     
-    toSheet.setName(this.formatedDateStr);
+    toSheet.setName(this.date.toLocaleDateString());
+    this.setColumnWidths(toSheet, template._columnWidths);
+    const numRows = template._layoutRange[2];
+    this.setRowsHeight(toSheet, numRows, template._rowHeight);
     toSheet.getRange(...template._layoutRange).clear();
 
-    const leafKeys = ['label', 'target'];
-    /**
-     * {Map} tree - having {Element} leaves
-     * {Map} elements - having key=keyFromCell(x,y), and value is {Element} leaf 
-     */
+    const leafKeys = Element.getSupportedTypes();
+    // {Map} tree - having {Element} leaves
+    // {Map} elements - having key=keyFromCell(x,y), and value is {Element} leaf 
     const [tree, elements] = objToMap(template, leafKeys);
-    log(elements.get(keyFromCell(13,4)).value);
-    //
-    //render all elements that have a value
+    // populate headers (general info displayed on top of report sheet)
+    tree.get('companyName').get('target_element').value = company.get('name');
+    tree.get('tax_id').get('target_element').value = company.get('tax_id');
+    tree.get('reg_num').get('target_element').value = company.get('reg_num');
+
+    // change label according to date (if date is 1st or not)
+    let label = tree.get('previous_balance').get('label_element');
+    if (this.date.getDate() === 1)
+      label.value = label.value.replace(/\/ziua/i, '');
+    else 
+      label.value = label.value.replace(/luna\//i, '');
+    // replace '{}' with date in corresponding labels
+    label = tree.get('total').get('label_element');
+    label.value = replaceCurly(label.value, this.date.toLocaleDateString()); 
+    label = tree.get('day_balance').get('label_element');
+    label.value = replaceCurly(label.value, this.date.toLocaleDateString()); 
+    
     for (const [key, element] of elements){
-      if (element.value)
-        element.render(toSheet) && log('rendered cell: '+key);
-    }
-
-    
-`previous_balance:{
-  label:{cell:[13,4], value:"SOLD LUNA/ZIUA PRECEDENTA"},
-  target:{cell:[13,5]}},
-record:{
-  data:{
-    target:{cell:[14,1]},
-  },`
-
-    tree.get('companyName').get('target').value = company.get('name');
-    tree.get('tax_id').get('target').value = company.get('tax_id');
-    tree.get('reg_num').get('target').value = company.get('reg_num');
-
-    log(tree.get('record').get('data').get('target').cell);
-      
-    log(`DailyReport rendered to sheet ${toSheet.getName()}`);
-    
+      element.render(toSheet);
+      }
   }
 }
-  
+
   
 const dataRange = srcRawDataSheet.getRange('A2:F');
 const records = getRecords(dataRange);
 const companyAlias = srcRawDataSheet.getSheetName().replace(RAWDATA_SHEET_SUFFIX, "");
 const company = companies.get(companyAlias);
-const dayTrades = records.get(fromDateStr);
-//  const dates = datesBetween(fromDateStr, toDateStr);
+const dayTrades = records.get(fromDate.toJSON());
+//  const dates = datesBetween(fromDate, toDate);
 
-const dayReport = new DailyReport(fromDateStr, company, dayTrades);
+const dayReport = new DailyReport(fromDate, company, dayTrades);
 dayReport.render(toSpreadsheet.getSheets()[0], TEMPLATE);
-
-return;
   
 
 
@@ -300,7 +325,7 @@ function objToMap(obj, leafKeys, leaves=new Map()){
     
     if (leafKeys.includes(key)){
       // if is a leaf
-      const element = new Element(obj[key]);
+      const element = new Element(key, obj[key]);
       mapTree.set(key, element);
       const [x, y] = obj[key].cell;
       leaves.set(keyFromCell(x, y), element); 
@@ -409,8 +434,8 @@ function Log(spreadsheetId, sheetIndex, cellPos){
   
   const logs = [];
 
-  const log = str => {
-    logs.push(str);
+  const log = (...args) => {
+    logs.push(args.toString());
     cell.setValue('> '+logs.join('\n> '));
   }
   return log;
@@ -421,6 +446,16 @@ function isObject(type){
   return typeof(type) === 'object' && type.constructor.name === 'Object';
 }
 
+/**
+ * Replaces '{}' from string with value
+ * 
+ * @param {string} templateString
+ * @param {*} value - will replace '{}'
+ * @returns {string} - replaced string
+ */
+function replaceCurly(templateString, value){
+  return templateString.replace(/\{\s*\}/, value.toString());
+}
 
 } // makeReport
 
