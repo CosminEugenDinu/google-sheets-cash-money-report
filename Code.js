@@ -177,104 +177,104 @@ class Element {
 
 }
 
-  /**
-   * 
-   */
-  class DailyReport {
-    constructor(dayDate, company, dataValues){
-      this.dateStr = dayDate;
-      this.formatedDateStr = dayDate.slice(0,10).split('-').reverse().join('/');
-      this.company = company;
-      this.values = dataValues;
-    }
-    
-    setColumnWidths(sheet, widths){
-      widths.map((w, i) => sheet.setColumnWidth(i+1, w));
-    }
-
-    _render(toSheet, template){
-      
-      toSheet.setName(this.formatedDateStr);
-      toSheet.getRange(...template._layoutRange).clear();
-      // groups of elements 
-      const groups = new Map(); 
-      for (const entityKey in TEMPLATE){
-        if ( entityKey.charAt(0) === '_') continue;
-        // elemTypes could be label, target
-        const elemTypes = TEMPLATE[entityKey];
-        for (const elemType in elemTypes){
-          const element = new Element(elemTypes[elemType]);
-          if (groups.has(entityKey)){
-            groups.get(entityKey).set(elemType, element);
-          } else {
-            groups.set(entityKey, new Map().set(elemType, element));
-          }
-        }
-      }
-      // set dynamic values in target elements
-      groups.get('companyName').get('target').value = company.get('name');
-      groups.get('tax_id').get('target').value = company.get('tax_id');
-      groups.get('reg_num').get('target').value = company.get('reg_num');
-      
-      for (const [group, elemTypes] of groups){
-        for (const [type, element] of elemTypes){ 
-          element.render(toSheet);
-        }
-      }
-      
-      log(`DailyReport rendered to sheet ${toSheet.getName()}`);
-      
-    }
-
-    render(toSheet, template){
-      
-      toSheet.setName(this.formatedDateStr);
-      toSheet.getRange(...template._layoutRange).clear();
-
-      const leafKeys = ['label', 'target'];
-      /**
-       * {Map} tree - having {Element} leaves
-       * {Map} elements - having key=keyFromCell(x,y), and value is {Element} leaf 
-       */
-      const [tree, elements] = objToMap(template, leafKeys);
-      log(elements.get(keyFromCell(13,4)).value);
-      //
-      //render all elements that have a value
-      for (const [key, element] of elements){
-        if (element.value)
-          element.render(toSheet) && log('rendered cell: '+key);
-      }
-
-      
-  `previous_balance:{
-    label:{cell:[13,4], value:"SOLD LUNA/ZIUA PRECEDENTA"},
-    target:{cell:[13,5]}},
-  record:{
-    data:{
-      target:{cell:[14,1]},
-    },`
-
-      tree.get('companyName').get('target').value = company.get('name');
-      tree.get('tax_id').get('target').value = company.get('tax_id');
-      tree.get('reg_num').get('target').value = company.get('reg_num');
-
-      log(tree.get('record').get('data').get('target').cell);
-        
-      log(`DailyReport rendered to sheet ${toSheet.getName()}`);
-      
-    }
+/**
+ * 
+ */
+class DailyReport {
+  constructor(dayDate, company, dataValues){
+    this.dateStr = dayDate;
+    this.formatedDateStr = dayDate.slice(0,10).split('-').reverse().join('/');
+    this.company = company;
+    this.values = dataValues;
   }
   
+  setColumnWidths(sheet, widths){
+    widths.map((w, i) => sheet.setColumnWidth(i+1, w));
+  }
+
+  _render(toSheet, template){
+    
+    toSheet.setName(this.formatedDateStr);
+    toSheet.getRange(...template._layoutRange).clear();
+    // groups of elements 
+    const groups = new Map(); 
+    for (const entityKey in TEMPLATE){
+      if ( entityKey.charAt(0) === '_') continue;
+      // elemTypes could be label, target
+      const elemTypes = TEMPLATE[entityKey];
+      for (const elemType in elemTypes){
+        const element = new Element(elemTypes[elemType]);
+        if (groups.has(entityKey)){
+          groups.get(entityKey).set(elemType, element);
+        } else {
+          groups.set(entityKey, new Map().set(elemType, element));
+        }
+      }
+    }
+    // set dynamic values in target elements
+    groups.get('companyName').get('target').value = company.get('name');
+    groups.get('tax_id').get('target').value = company.get('tax_id');
+    groups.get('reg_num').get('target').value = company.get('reg_num');
+    
+    for (const [group, elemTypes] of groups){
+      for (const [type, element] of elemTypes){ 
+        element.render(toSheet);
+      }
+    }
+    
+    log(`DailyReport rendered to sheet ${toSheet.getName()}`);
+    
+  }
+
+  render(toSheet, template){
+    
+    toSheet.setName(this.formatedDateStr);
+    toSheet.getRange(...template._layoutRange).clear();
+
+    const leafKeys = ['label', 'target'];
+    /**
+     * {Map} tree - having {Element} leaves
+     * {Map} elements - having key=keyFromCell(x,y), and value is {Element} leaf 
+     */
+    const [tree, elements] = objToMap(template, leafKeys);
+    log(elements.get(keyFromCell(13,4)).value);
+    //
+    //render all elements that have a value
+    for (const [key, element] of elements){
+      if (element.value)
+        element.render(toSheet) && log('rendered cell: '+key);
+    }
+
+    
+`previous_balance:{
+  label:{cell:[13,4], value:"SOLD LUNA/ZIUA PRECEDENTA"},
+  target:{cell:[13,5]}},
+record:{
+  data:{
+    target:{cell:[14,1]},
+  },`
+
+    tree.get('companyName').get('target').value = company.get('name');
+    tree.get('tax_id').get('target').value = company.get('tax_id');
+    tree.get('reg_num').get('target').value = company.get('reg_num');
+
+    log(tree.get('record').get('data').get('target').cell);
+      
+    log(`DailyReport rendered to sheet ${toSheet.getName()}`);
+    
+  }
+}
   
-  const dataRange = srcRawDataSheet.getRange('A2:F');
-  const records = getRecords(dataRange);
-  const companyAlias = srcRawDataSheet.getSheetName().replace(RAWDATA_SHEET_SUFFIX, "");
-  const company = companies.get(companyAlias);
-  const dayTrades = records.get(fromDateStr);
+  
+const dataRange = srcRawDataSheet.getRange('A2:F');
+const records = getRecords(dataRange);
+const companyAlias = srcRawDataSheet.getSheetName().replace(RAWDATA_SHEET_SUFFIX, "");
+const company = companies.get(companyAlias);
+const dayTrades = records.get(fromDateStr);
 //  const dates = datesBetween(fromDateStr, toDateStr);
 
-  const dayReport = new DailyReport(fromDateStr, company, dayTrades);
-  dayReport.render(toSpreadsheet.getSheets()[0], TEMPLATE);
+const dayReport = new DailyReport(fromDateStr, company, dayTrades);
+dayReport.render(toSpreadsheet.getSheets()[0], TEMPLATE);
 
 return;
   
@@ -386,6 +386,13 @@ function updateRawDataSheetNames(rawDataSheets, computedNames){
         (sheet, i) => sheet.setName(computedNames[i])
       )
 }
+
+/**
+ * Logging function
+ * @param {Sheet} spreadsheetId - https://docs.google.com/spreadsheets/d/spreadsheetId/edit#gid=0
+ * @param {Number} sheetIndex - numeric index (including 0) of {Sheet} targeted
+ * @param {Array} cellPos - tuple array with cell position [x, y] - console output cell
+ */
 function Log(spreadsheetId, sheetIndex, cellPos){
   const spreadSheet = SpreadsheetApp.openById(spreadsheetId);
   const sheet = spreadSheet.getSheets()[sheetIndex];
