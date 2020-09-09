@@ -388,7 +388,10 @@ function updateRawDataSheetNames(rawDataSheets, computedNames){
 }
 
 /**
- * Logging function
+ * Logging function - logs to specified cell
+ *      - instantiate with const log = Log(spreadsheetId, sheetIndex, cellPos);
+ *      - usage: log("Welcome to log console!");
+ *
  * @param {Sheet} spreadsheetId - https://docs.google.com/spreadsheets/d/spreadsheetId/edit#gid=0
  * @param {Number} sheetIndex - numeric index (including 0) of {Sheet} targeted
  * @param {Array} cellPos - tuple array with cell position [x, y] - console output cell
