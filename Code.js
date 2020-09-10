@@ -102,8 +102,6 @@ const rawDataSheets = repGenSprSheet.getSheets().filter(
   // get all sheets except Interface and settings
   return (sheetName !== INTERFACE_SHEET_NAME) && (sheetName !== SETTINGS_SHEET_NAME);
 });
-
-
   
 // if company alias name was changed in settings
 updateRawDataSheetNames(rawDataSheets, computedRawDataSheetNames);
@@ -124,14 +122,19 @@ const srcRawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET
  * for each date:
  * 	dayReport.render(toSheet);
  */ 
+const company = companies.get(companyAlias);
+
 //-----------------------------------------------------------------
-renderReport(repSprSheet, srcRawDataSheet, fromDate, toDate);
+//renderReport(repSprSheet, srcRawDataSheet, fromDate, toDate);
+renderReport(fromDate, toDate, company, dataRecords);
 //-----------------------------------------------------------------
 
 
 // ------ library -----------------------------------------------------------------
 
-function renderReport(toSpreadsheet, srcRawDataSheet, fromDate, toDate){
+
+//function renderReport(toSpreadsheet, srcRawDataSheet, fromDate, toDate){
+function renderReport(fromDate, toDate, company, dataRecords);
 
 /**
  * Class Element - is a piece of sheet... (cell, range)
@@ -218,7 +221,6 @@ class Element {
       if (this.extent) 
         range = sheet.getRange(...this.cell, ...this.extent);
     }
-      
 
     for (const prop in this.style)
       Element.setProperty(range, prop, this.style[prop]);
@@ -236,8 +238,6 @@ Element._typesProps.set('label_element',
 Element._typesProps.set('frame_element',
   ['cell', 'extent', 'style']);
 Element._supportedTypes = Array.from(Element._typesProps.keys());
-
-
 
 
 /**
@@ -296,7 +296,7 @@ class DailyReport {
 const dataRange = srcRawDataSheet.getRange('A2:F');
 const records = getRecords(dataRange);
 const companyAlias = srcRawDataSheet.getSheetName().replace(RAWDATA_SHEET_SUFFIX, "");
-const company = companies.get(companyAlias);
+//const company = companies.get(companyAlias);
 const dayTrades = records.get(fromDate.toJSON());
 //  const dates = datesBetween(fromDate, toDate);
 
@@ -339,6 +339,26 @@ function objToMap(obj, leafKeys, leaves=new Map()){
   }
   return [mapTree, leaves]
 }
+
+class Report{
+  constructor(fromDate, toDate, company, dataRecords){
+    this.fromDate = fromDate;
+    this.toDate = toDate;
+    this.company = company;
+    this.dataRecords = dataRecords;
+  }
+  
+  render(spreadsheetId){
+    /* for every date between fromDate and toDate:
+     *   collect dataRecords and group by date in a {Map},
+     *   generate an instance of {DailyReport},
+     *   create a new {Sheet} instance in {Spreadsheet} and name it with date,
+     *   render every dayReport to sheet according with date,
+     *   and DONE
+     */
+    return
+  }
+
 
 } // renderReport 
 
