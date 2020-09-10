@@ -123,10 +123,18 @@ const srcRawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET
  * 	dayReport.render(toSheet);
  */ 
 const company = companies.get(companyAlias);
+//const dataRange = srcRawDataSheet.getRange('A2:F');
+//const records = getRecords(dataRange);
+//const companyAlias = srcRawDataSheet.getSheetName().replace(RAWDATA_SHEET_SUFFIX, "");
+//const company = companies.get(companyAlias);
+//const dayTrades = records.get(fromDate.toJSON());
+//const dates = datesBetween(fromDate, toDate);
 
 //-----------------------------------------------------------------
 //renderReport(repSprSheet, srcRawDataSheet, fromDate, toDate);
-renderReport(fromDate, toDate, company, dataRecords);
+const dataRecords = new Map();
+const targetSpreadsheet = repSprSheet;
+renderReport(fromDate, toDate, company, dataRecords, targetSpreadsheet);
 //-----------------------------------------------------------------
 
 
@@ -134,7 +142,7 @@ renderReport(fromDate, toDate, company, dataRecords);
 
 
 //function renderReport(toSpreadsheet, srcRawDataSheet, fromDate, toDate){
-function renderReport(fromDate, toDate, company, dataRecords);
+function renderReport(fromDate, toDate, company, dataRecords){
 
 /**
  * Class Element - is a piece of sheet... (cell, range)
@@ -244,8 +252,8 @@ Element._supportedTypes = Array.from(Element._typesProps.keys());
  * 
  */
 class DailyReport {
-  constructor(dayDate, company, dataValues){
-    this.date = dayDate;
+  constructor(date, company, dataValues){
+    this.date = date;
     this.company = company;
     this.values = dataValues;
   }
@@ -293,17 +301,7 @@ class DailyReport {
 }
 
   
-const dataRange = srcRawDataSheet.getRange('A2:F');
-const records = getRecords(dataRange);
-const companyAlias = srcRawDataSheet.getSheetName().replace(RAWDATA_SHEET_SUFFIX, "");
-//const company = companies.get(companyAlias);
-const dayTrades = records.get(fromDate.toJSON());
-//  const dates = datesBetween(fromDate, toDate);
-
-const dayReport = new DailyReport(fromDate, company, dayTrades);
-dayReport.render(toSpreadsheet.getSheets()[0], TEMPLATE);
   
-
 
 /**
  * Algorithm to convert JSON-like object to tree of Map instances.
@@ -348,7 +346,7 @@ class Report{
     this.dataRecords = dataRecords;
   }
   
-  render(spreadsheetId){
+  render(targetSpreadsheet){
     /* for every date between fromDate and toDate:
      *   collect dataRecords and group by date in a {Map},
      *   generate an instance of {DailyReport},
@@ -356,8 +354,23 @@ class Report{
      *   render every dayReport to sheet according with date,
      *   and DONE
      */
-    return
+    //const dataRange = srcRawDataSheet.getRange('A2:F');
+    //const companyAlias = srcRawDataSheet.getSheetName().replace(RAWDATA_SHEET_SUFFIX, "");
+    const dayTrades = dataRecords.get(fromDate.toJSON());
+    //const dates = datesBetween(fromDate, toDate);
+
+    const dayReport = new DailyReport(fromDate, company, dayTrades);
+    dayReport.render(targetSpreadsheet.getSheets()[0], TEMPLATE);
+    return;
   }
+
+
+}
+
+//----------------------------------------------------------------
+//-------------- render all reports ------------------------------
+const report = new Report(fromDate, toDate, company, dataRecords)
+report.render(targetSpreadsheet);
 
 
 } // renderReport 
@@ -478,4 +491,5 @@ function replaceCurly(templateString, value){
 }
 
 } // makeReport
+
 
