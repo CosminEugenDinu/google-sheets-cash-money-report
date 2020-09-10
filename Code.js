@@ -113,15 +113,7 @@ const [[fromDate, toDate]] = interface.getSheetValues(8,3,1,2);
 
 // data source sheet corresponds with chosen company alias from drop-down
 const srcRawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SUFFIX);
-/*
- * should be something like this:
- * const reports = new Reports(fromDate, toDate, company, dataRecords);
- * reports.render(repSprSheet);
- * Inside reports would be something like:
- * const dayReport = new DailyReport(...);
- * for each date:
- * 	dayReport.render(toSheet);
- */ 
+
 const company = companies.get(companyAlias);
 //const dataRange = srcRawDataSheet.getRange('A2:F');
 //const records = getRecords(dataRange);
@@ -130,18 +122,23 @@ const company = companies.get(companyAlias);
 //const dayTrades = records.get(fromDate.toJSON());
 //const dates = datesBetween(fromDate, toDate);
 
-//-----------------------------------------------------------------
-//renderReport(repSprSheet, srcRawDataSheet, fromDate, toDate);
 const dataRecords = new Map();
 const targetSpreadsheet = repSprSheet;
+
+//-----------------------------------------------------------------
 renderReport(fromDate, toDate, company, dataRecords, targetSpreadsheet);
 //-----------------------------------------------------------------
 
 
+
+
+
+
+
+
+
 // ------ library -----------------------------------------------------------------
 
-
-//function renderReport(toSpreadsheet, srcRawDataSheet, fromDate, toDate){
 function renderReport(fromDate, toDate, company, dataRecords){
 
 /**
@@ -267,6 +264,22 @@ class DailyReport {
   }
 
   /**
+   * Converts tuple array like [1, 2] into {string} key '1:2'
+   */
+  static keyFromCell(x, y){
+    const key = `${x}:${y}`;
+    return key;
+  }
+
+  /**
+   * Converts {string} key (e.g. '1:2') into tuple array (e.g. [1, 2])
+   */
+  static cellFromKey(key){
+    const tuple = key.split(':').map(letter=>+letter);
+    return tuple // cell 
+  }
+
+  /**
    * Utility function to convert {Object} template to a tree of {Map}.
    * 
    * @param {Object} obj - JSON-like object
@@ -287,7 +300,7 @@ class DailyReport {
         const element = new Element(key, obj[key]);
         mapTree.set(key, element);
         const [x, y] = obj[key].cell;
-        leaves.set(keyFromCell(x, y), element); 
+        leaves.set(DailyReport.keyFromCell(x, y), element); 
       } 
       // does not recurses on arrays; are passed over
       else if (isObject(obj[key])){
@@ -309,7 +322,7 @@ class DailyReport {
 
     const leafKeys = Element.getSupportedTypes();
     // {Map} tree - having {Element} leaves
-    // {Map} elements - having key=keyFromCell(x,y), and value is {Element} leaf 
+    // {Map} elements - having key=DailyReport.keyFromCell(x,y), and value is {Element} leaf 
     const [tree, elements] = DailyReport.objToMap(template, leafKeys);
     // populate headers (general info displayed on top of report sheet)
     tree.get('companyName').get('target_element').value = company.get('name');
@@ -368,27 +381,24 @@ class Report{
 //-------------- render all reports ------------------------------
 const report = new Report(fromDate, toDate, company, dataRecords)
 report.render(targetSpreadsheet);
+//================================================================
 
 
-} // renderReport 
+} // renderReport END
 
-// -----------------------------------------------
 
-/**
- * Converts tuple array like [1, 2] into {string} key '1:2'
- */
-function keyFromCell(x, y){
-  const key = `${x}:${y}`;
-  return key;
-}
 
-/**
- * Converts {string} key (e.g. '1:2') into tuple array (e.g. [1, 2])
- */
-function cellFromKey(key){
-  const tuple = key.split(':').map(letter=>+letter);
-  return tuple // cell 
-}
+
+
+
+
+
+
+
+
+
+
+// ----------Global functions (in makeReport scope)---------------
 
 function getCompanies(sheet, records=10, fields=4){
   const companies = new Map();
@@ -487,6 +497,6 @@ function replaceCurly(templateString, value){
   return templateString.replace(/\{\s*\}/, value.toString());
 }
 
-} // makeReport
+} // makeReport END
 
 
