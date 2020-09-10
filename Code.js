@@ -252,6 +252,7 @@ Element._supportedTypes = Array.from(Element._typesProps.keys());
  * 
  */
 class DailyReport {
+
   constructor(date, company, dataValues){
     this.date = date;
     this.company = company;
@@ -265,6 +266,39 @@ class DailyReport {
     sheet.setRowHeights(1, numRows, height);
   }
 
+  /**
+   * Utility function to convert {Object} template to a tree of {Map}.
+   * 
+   * @param {Object} obj - JSON-like object
+   * @param {Array} leafKeys - array of {string}, keys in obj that stores leaves 
+   * @returns {Array} [mapTree, leaves] - 
+   *   {Map} mapTree - a tree of {Map} instances, having {Element} leaves 
+   *   {Map} leaves - reference to every leaf, having keys {Array} [x,y],
+   *   that corresponds to 'cell' property of {Element}
+   */
+  static objToMap(obj, leafKeys, leaves=new Map()){
+
+    const mapTree = new Map();
+
+    for (const key in obj){
+      
+      if (leafKeys.includes(key)){
+        // if is a leaf
+        const element = new Element(key, obj[key]);
+        mapTree.set(key, element);
+        const [x, y] = obj[key].cell;
+        leaves.set(keyFromCell(x, y), element); 
+      } 
+      // does not recurses on arrays; are passed over
+      else if (isObject(obj[key])){
+        const [subTree, _leaves]  = DailyReport.objToMap(obj[key], leafKeys, leaves);
+        mapTree.set(key, subTree);
+      }
+        
+    }
+    return [mapTree, leaves]
+  }
+
   render(toSheet, template){
     
     toSheet.setName(this.date.toLocaleDateString());
@@ -276,7 +310,7 @@ class DailyReport {
     const leafKeys = Element.getSupportedTypes();
     // {Map} tree - having {Element} leaves
     // {Map} elements - having key=keyFromCell(x,y), and value is {Element} leaf 
-    const [tree, elements] = objToMap(template, leafKeys);
+    const [tree, elements] = DailyReport.objToMap(template, leafKeys);
     // populate headers (general info displayed on top of report sheet)
     tree.get('companyName').get('target_element').value = company.get('name');
     tree.get('tax_id').get('target_element').value = company.get('tax_id');
@@ -300,43 +334,7 @@ class DailyReport {
   }
 }
 
-  
-  
 
-/**
- * Algorithm to convert JSON-like object to tree of Map instances.
- * Leaves are of type {Object}.
- * 
- * @param {Object} obj - JSON-like object
- * @param {Array} leafKeys - array of {string}, keys in obj that stores leaves 
- * @returns {Array} [mapTree, leaves] - 
- *   {Map} mapTree - a tree of {Map} instances, having {Element} leaves 
- *   {Map} leaves - reference to every leaf, having keys {Array} [x,y],
- *   that corresponds to 'cell' property of {Element}
- */
-
-function objToMap(obj, leafKeys, leaves=new Map()){
-
-  const mapTree = new Map();
-
-  for (const key in obj){
-    
-    if (leafKeys.includes(key)){
-      // if is a leaf
-      const element = new Element(key, obj[key]);
-      mapTree.set(key, element);
-      const [x, y] = obj[key].cell;
-      leaves.set(keyFromCell(x, y), element); 
-    } 
-    // does not recurses on arrays; are passed over
-    else if (isObject(obj[key])){
-      const [subTree, _leaves]  = objToMap(obj[key], leafKeys, leaves);
-      mapTree.set(key, subTree);
-    }
-      
-  }
-  return [mapTree, leaves]
-}
 
 class Report{
   constructor(fromDate, toDate, company, dataRecords){
@@ -354,8 +352,7 @@ class Report{
      *   render every dayReport to sheet according with date,
      *   and DONE
      */
-    //const dataRange = srcRawDataSheet.getRange('A2:F');
-    //const companyAlias = srcRawDataSheet.getSheetName().replace(RAWDATA_SHEET_SUFFIX, "");
+
     const dayTrades = dataRecords.get(fromDate.toJSON());
     //const dates = datesBetween(fromDate, toDate);
 
@@ -375,7 +372,7 @@ report.render(targetSpreadsheet);
 
 } // renderReport 
 
-// -----------------------Global functions------------------------
+// -----------------------------------------------
 
 /**
  * Converts tuple array like [1, 2] into {string} key '1:2'
