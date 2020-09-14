@@ -123,13 +123,14 @@ const srcRawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET
 const dataRange = srcRawDataSheet.getRange('A2:F');
 
 // user selects in interface
+const procedure = interface.getSheetValues(8,1,1,1)[0][0];
+
 const [[fromDate, toDate]] = interface.getSheetValues(8,3,1,2);
 const company = companies.get(companyAlias);
 const dataRecords = getRecords(dataRange);
 const template = TEMPLATE;
 const targetSpreadsheet = repSprSheet;
 
-const procedure = interface.getSheetValues(8,1,1,1)[0][0];
 //-----------------------------------------------------------------
 procedure === 'renderReport' && renderReport(
   fromDate,
@@ -138,11 +139,21 @@ procedure === 'renderReport' && renderReport(
   dataRecords,
   template,
   targetSpreadsheet);
-//-----------------------------------------------------------------
-procedure === 'importData' && importData(
-);
+
 //-----------------------------------------------------------------
 
+const dataLinks = settings.getSheetValues(1,16,1000,3);
+const [sheetToImportTo] = rawDataSheets.filter(
+  sheet => sheet.getName() === company.get('alias')+RAWDATA_SHEET_SUFFIX
+  )
+procedure === 'importData' && importData(
+  fromDate,
+  toDate,
+  company,
+  dataLinks,
+  sheetToImportTo
+);
+//-----------------------------------------------------------------
 
 
 
@@ -525,13 +536,77 @@ report.render(targetSpreadsheet);
 log("Procedure renderReport END");
 } // renderReport END
 
-function importData(){
-  log("importData called");
+
+/**
+ * Searches for company data records in provided links to standalone spreadsheets,
+ * and populate corresponding rawDataSheet.
+ *
+ * @param {Map} company - dict with company info keys like 'name', 'alias', etc
+ * @param {Array[][]} dataLinks - records with links (urls) of google sheets
+ *      - dataLinks[0]: list of fields names, like [link.company1, link.company2, ...]
+ *      - dataLinks[1...n]: records of links, like ['link1', 'link2', ...] 
+ *      - dataLinks[row][column]: {string} like 'https://docs.google.com/spreadsheets/d/<< sheetId >>/edit#gid=xxxxxxxxxx';
+ *
+ * @returns {Map} records
+ *      - {string} keys - dates (ISO 8601)
+ *      - {Array} values - of {Map} records, like {'date'=>{Date}, 'ref'=>32, etc.} 
+ */
+function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
+  
+  log("Procedure importData begin");
+
+  const records = new Map();
+
+  // tableName the prefix before '.' in field name, like tableName.fieldName
+  const linkTableName = 'link';
+  const linkFieldNames = dataLinks[0].map(
+    fullName => fullName.replace(new RegExp(`^${linkTableName}\.`), '')
+    );
+  // index of field with name = company alias
+  const companyIndex = linkFieldNames.indexOf(company.get('alias'));
+
+  // list of google sheets ids 
+  const sheetIds = (dataLinks => {
+    const link = dataLinks[1][companyIndex];
+    const urlReStr = 'https\:\/\/docs.google.com\/spreadsheets.*\/d\/';
+    const idReStr = '(?<id>.*)';
+    const restReStr = '\/.*';
+    const sheetIdRe = new RegExp(`${urlReStr}${idReStr}${restReStr}`);
+    const links = [];
+    // count the number successive empty rows  
+    let numOfEmpty = 0; 
+    let i = 1;
+    while (numOfEmpty < 10){
+      const link = dataLinks[i++][companyIndex];
+      if (link){
+        const {id: sheetId} = link.match(sheetIdRe).groups;
+        links.push(sheetId);
+        numOfEmpty = 0;
+      } else {
+        ++ numOfEmpty;
+      }
+    }
+    return links;
+  })(dataLinks)
+
+  // list of source Spreadsheets opened by ids;
+  const srcSheets = sheetIds.map(
+    sheetId => {
+      try{
+        return SpreadsheetApp.openById(sheetId);
+      } catch(e){
+        log('When opening sheet with id\n', sheetId, '\ngot: ', e);
+      }
+    }
+  );
+  log("srcheets.length ", srcSheets.length);
+
 }
 
 
 
 // ----------Global functions (in makeReport scope)---------------
+
 
 /**
  * @param {Date} date1
