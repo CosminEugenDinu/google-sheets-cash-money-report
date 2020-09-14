@@ -94,7 +94,6 @@ const TEMPLATE = {
 
 // instantiate log function
 const log = Log(REPORT_GENERATOR_SPREADSHEET_ID, 0, [10,5]);
-log("makeReport procedure begin...");
   
 const repGenSprSheet = SpreadsheetApp.openById(REPORT_GENERATOR_SPREADSHEET_ID);
 const repSprSheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
@@ -130,15 +129,19 @@ const dataRecords = getRecords(dataRange);
 const template = TEMPLATE;
 const targetSpreadsheet = repSprSheet;
 
-
+const procedure = interface.getSheetValues(8,1,1,1)[0][0];
 //-----------------------------------------------------------------
-renderReport(fromDate, toDate, company, dataRecords, template, targetSpreadsheet);
+procedure === 'renderReport' && renderReport(
+  fromDate,
+  toDate,
+  company,
+  dataRecords,
+  template,
+  targetSpreadsheet);
 //-----------------------------------------------------------------
-
-
-
-
-
+procedure === 'importData' && importData(
+);
+//-----------------------------------------------------------------
 
 
 
@@ -146,6 +149,7 @@ renderReport(fromDate, toDate, company, dataRecords, template, targetSpreadsheet
 // -------------------------- library --------------------------------
 
 function renderReport(fromDate, toDate, company, dataRecords){
+log("Procedure renderReport begin");
 
 /**
  * Class Element - is a piece of sheet... (cell, range)
@@ -518,18 +522,12 @@ const report = new Report(fromDate, toDate, company, dataRecords, template)
 report.render(targetSpreadsheet);
 //================================================================
 
-
+log("Procedure renderReport END");
 } // renderReport END
 
-
-
-
-
-
-
-
-
-
+function importData(){
+  log("importData called");
+}
 
 
 
