@@ -344,7 +344,7 @@ class DailyReport {
 
     if (!this.values) new TypeError(`Cannot render {DailyReport} instance if data values is ${this.values}`);
     
-    toSheet.setName(this.date.toLocaleDateString());
+    toSheet.setName(this.date.toLocaleDateString('ro-RO'));
     this.setColumnWidths(toSheet, template._columnWidths);
     const numRows = template._layoutRange[2];
     this.setRowsHeight(toSheet, numRows, template._rowHeight);
@@ -367,9 +367,9 @@ class DailyReport {
       label.value = label.value.replace(/luna\//i, '');
     // replace '{}' with date in corresponding labels
     label = tree.get('total').get('label_element');
-    label.value = replaceCurly(label.value, this.date.toLocaleDateString()); 
+    label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
     label = tree.get('day_balance').get('label_element');
-    label.value = replaceCurly(label.value, this.date.toLocaleDateString()); 
+    label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
 
     // render all elements that has a value till now 
     for (const [key, element] of elements){
@@ -396,7 +396,7 @@ class DailyReport {
           const uiTarget = uiRecord.get(uiKey).get('target_element');
           // modify according with some criteria
           if (uiKey === 'date'){
-            uiTarget.value = new Date(record.get(dataKey)).toLocaleDateString();
+            uiTarget.value = new Date(record.get(dataKey)).toLocaleDateString('ro-RO');
             const origVal = uiTarget.cell[0];
             uiTarget.cell[0] = rowNum;
             uiTarget.render(toSheet);
@@ -513,7 +513,7 @@ class Report{
     const dates = datesBetween(fromDate, toDate);
     let sheetIndex = 1
     for (const date of dates){
-      log(new Date(date).toLocaleDateString());
+      log(new Date(date).toLocaleDateString('ro-RO'));
       const dayTrades = dataRecords.get(date);
       if (!dayTrades) continue;
       const sheet = targetSpreadsheet.insertSheet(sheetIndex++);
@@ -546,16 +546,9 @@ log("Procedure renderReport END");
  *      - dataLinks[0]: list of fields names, like [link.company1, link.company2, ...]
  *      - dataLinks[1...n]: records of links, like ['link1', 'link2', ...] 
  *      - dataLinks[row][column]: {string} like 'https://docs.google.com/spreadsheets/d/<< sheetId >>/edit#gid=xxxxxxxxxx';
- *
- * @returns {Map} records
- *      - {string} keys - dates (ISO 8601)
- *      - {Array} values - of {Map} records, like {'date'=>{Date}, 'ref'=>32, etc.} 
  */
 function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
-  
   log("Procedure importData begin");
-
-  const records = new Map();
 
   // tableName the prefix before '.' in field name, like tableName.fieldName
   const linkTableName = 'link';
@@ -589,7 +582,7 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
   })(dataLinks)
 
   // list of source Spreadsheets opened by ids;
-  const srcSheets = sheetIds.map(
+  const srcSpreadsheets = sheetIds.map(
     sheetId => {
       try{
         return SpreadsheetApp.openById(sheetId);
@@ -598,14 +591,111 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
       }
     }
   );
-  log("srcheets.length ", srcSheets.length);
 
-  return records; 
+  if ( ! srcSpreadsheets.length){
+    log('No source spreadsheets opened!'); 
+    return 2;
+  }
+
+  const foundRecords = searchRecords(srcSpreadsheets[0], 50, 6);
+
+
+  if (!foundRecords.size)
+    log(`Found ${foundRecords.size} records in spreadsheet ${srcSpreadsheets[0].getName()}`);
+
 } // importData END
 
 
 
 // ----------Global functions (in makeReport scope)---------------
+
+
+/**
+ * @param {Spreadsheet} spreadsheet
+ * @param {Number} rowLim - maximum number of rows to search
+ * @param {Number} colLim - maximum number of columns to search
+ * @returns {Map} records
+ *      - {string} keys - dates (ISO 8601)
+ *      - {Array} values - of {Map} records, like {'date'=>{Date}, 'ref'=>32, etc.} 
+ */
+function searchRecords(spreadsheet, rowLim, colLim){
+  const records = new Map();
+
+  // pattern to search against 
+  const identifierRe = /=RIGHT\(CELL\("filename",A\d\),LEN\(CELL\("filename",A\d\)\)-FIND\("\]",CELL\("filename",A\d\)\)\)/;
+
+  for (const sheet of spreadsheet.getSheets()){
+    
+    const sheetRecords = [];
+    
+    // looks in first column for identifier (which is a formula)
+    const searchRange = sheet.getRange(1,1,rowLim,1);
+    // {Array[][]} formulas
+    const formulas = searchRange.getFormulas();
+
+    // iterate over first column and search for pattern
+    let row_i = -1;
+    while(++row_i < formulas.length){
+      // if pattern is found, then look 5 columns right for record
+      if (formulas[row_i][0].match(identifierRe)){
+        // if record has at least one value, then is a valid record 
+        const [record] = sheet.getSheetValues(row_i+1, 2, 1, colLim-1);
+        isValidRecord(record) && sheetRecords.push(record);
+      }
+    }
+
+    // if some records were found, return them as a {Map} dictionary 
+    if (sheetRecords.length){
+      // assume sheetName is a date string like '01.02.2020'; 
+      const [d, m, y] = sheet.getName().split('.');
+      const dateStr = new Date(+y, +m-1, +d).toJSON();
+      const recordMap = new Map();
+      const fields = ['ref', 'doc_type', 'descr', 'I_O_type', 'value'];
+      for (const field of fields) recordMap.set(field, []);
+
+      sheetRecords.map(
+        record => {
+          const [ref, doc_type, descr, input, output] = record;
+          recordMap.get('ref').push(ref);
+          recordMap.get('dec_type').push(doc_type);
+          recordMap.get('descr').push(descr);
+          if (input)
+            recordMap.get('I_O_type').push(1);
+          else if (output)
+            recordMap.get('I_O_type').push(0);
+          recordMap.get('value').push(input || output);
+        }
+      );
+
+      return records;
+
+    } else {
+      log(`No records found in sheet ${sheet.getName()}, in spreadsheet ${spreadsheet.getName()}`);
+    }
+  }
+  
+
+}
+
+/**
+ * Verifies if a record is valid
+ * 
+ * @param {Array[]} record - contains three values
+ * @returns {Boolean} isValid 
+ */
+function isValidRecord(record){
+
+  const len = 5;
+  if (record.length !== len) return false;
+
+  // if at least one value is truthy, then is a valid record
+  let i = -1;
+  while (++i < len)
+    if (record[i]) return true;
+
+  return false;
+}
+
 
 /**
  * @param {string} link - google sheet url link
@@ -724,6 +814,8 @@ function Log(spreadsheetId, sheetIndex, cellPos){
   const log = (...args) => {
     logs.push(args.toString());
     cell.setValue('> '+logs.join('\n> '));
+    // returns true to permit chaining like: log('something') && another_statement;
+    return true;
   }
   return log;
 }
