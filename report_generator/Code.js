@@ -567,10 +567,6 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
 
   // list of google sheets ids 
   const sheetIds = (dataLinks => {
-    const urlReStr = 'https\:\/\/docs.google.com\/spreadsheets.*\/d\/';
-    const idReStr = '(?<id>.*)';
-    const restReStr = '\/.*';
-    const sheetIdRe = new RegExp(`${urlReStr}${idReStr}${restReStr}`);
     const links = [];
     // count the number successive empty rows  
     let numOfEmpty = 0; 
@@ -579,11 +575,11 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
       const link = dataLinks[i++][companyIndex];
       if (link){
         try {
-        const {id: sheetId} = link.match(sheetIdRe).groups;
-        links.push(sheetId);
-        numOfEmpty = 0;
+          const sheetId = extractId(link);
+          links.push(sheetId);
+          numOfEmpty = 0;
         } catch(e){
-          log(`Seems that link:\n${link}\ndoes not match pattern.`);
+          log(`${e}\nSeems that link:\n${link}\ndoes not match pattern.`);
         }
       } else {
         ++ numOfEmpty;
@@ -604,11 +600,25 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
   );
   log("srcheets.length ", srcSheets.length);
 
-}
+  return records; 
+} // importData END
 
 
 
 // ----------Global functions (in makeReport scope)---------------
+
+/**
+ * @param {string} link - google sheet url link
+ * @returns {string} id - spreadsheet id
+ */
+function extractId(link){
+  const urlReStr = 'https\:\/\/docs.google.com\/spreadsheets.*\/d\/';
+  const idReStr = '(?<id>.*)';
+  const restReStr = '\/.*';
+  const sheetIdRe = new RegExp(`${urlReStr}${idReStr}${restReStr}`);
+  const {id} = link.match(sheetIdRe).groups;
+  return id;
+}
 
 
 /**
