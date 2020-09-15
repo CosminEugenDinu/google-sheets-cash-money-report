@@ -567,7 +567,6 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
 
   // list of google sheets ids 
   const sheetIds = (dataLinks => {
-    const link = dataLinks[1][companyIndex];
     const urlReStr = 'https\:\/\/docs.google.com\/spreadsheets.*\/d\/';
     const idReStr = '(?<id>.*)';
     const restReStr = '\/.*';
@@ -579,9 +578,13 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
     while (numOfEmpty < 10){
       const link = dataLinks[i++][companyIndex];
       if (link){
+        try {
         const {id: sheetId} = link.match(sheetIdRe).groups;
         links.push(sheetId);
         numOfEmpty = 0;
+        } catch(e){
+          log(`Seems that link:\n${link}\ndoes not match pattern.`);
+        }
       } else {
         ++ numOfEmpty;
       }
