@@ -116,16 +116,19 @@ const rawDataSheets = repGenSprSheet.getSheets().filter(
 // if company alias name was changed in settings
 updateRawDataSheetNames(rawDataSheets, computedRawDataSheetNames);
 
-// user choose company alias from drop-down in interface
-const [[companyAlias]] = interface.getSheetValues(8,2,1,1);
+// user selects in interface
+const procedure = interface.getSheetValues(8,1,1,1)[0][0];
+const companyAlias = interface.getSheetValues(8,2,1,1)[0][0];
+const [fromDate, toDate] = interface.getSheetValues(8,3,1,2)[0];
+const verbosity = interface.getSheetValues(8,5,1,1)[0][0];
+// v=0 - critical, v=1 - informal, v=2 - too verbose
+const v = +verbosity;
+
 // data source sheet corresponds with chosen company alias from drop-down
 const srcRawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SUFFIX);
 const dataRange = srcRawDataSheet.getRange('A2:F');
 
-// user selects in interface
-const procedure = interface.getSheetValues(8,1,1,1)[0][0];
 
-const [[fromDate, toDate]] = interface.getSheetValues(8,3,1,2);
 const company = companies.get(companyAlias);
 const dataRecords = getRecords(dataRange);
 const template = TEMPLATE;
@@ -160,7 +163,7 @@ procedure === 'importData' && importData(
 // -------------------------- library --------------------------------
 
 function renderReport(fromDate, toDate, company, dataRecords){
-log("Procedure renderReport begin");
+v>1&& log('Procedure renderReport begin');
 
 /**
  * Class Element - is a piece of sheet... (cell, range)
@@ -502,7 +505,6 @@ class Report{
 
     // delete existing sheets except first
     targetSpreadsheet.getSheets().forEach(sheet =>{
-      log(sheet.getIndex(), sheet.getName());
       if (sheet.getIndex() === 1) 
         // cover sheet 
         sheet.setName('Cover');
@@ -513,7 +515,6 @@ class Report{
     const dates = datesBetween(fromDate, toDate);
     let sheetIndex = 1
     for (const date of dates){
-      log(new Date(date).toLocaleDateString('ro-RO'));
       const dayTrades = dataRecords.get(date);
       if (!dayTrades) continue;
       const sheet = targetSpreadsheet.insertSheet(sheetIndex++);
@@ -533,7 +534,7 @@ const report = new Report(fromDate, toDate, company, dataRecords, template)
 report.render(targetSpreadsheet);
 //================================================================
 
-log("Procedure renderReport END");
+v>1&& log('Procedure renderReport END');
 } // renderReport END
 
 
@@ -548,7 +549,7 @@ log("Procedure renderReport END");
  *      - dataLinks[row][column]: {string} like 'https://docs.google.com/spreadsheets/d/<< sheetId >>/edit#gid=xxxxxxxxxx';
  */
 function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
-  log("Procedure importData begin");
+  v>1&& log('Procedure importData begin');
 
   // tableName the prefix before '.' in field name, like tableName.fieldName
   const linkTableName = 'link';
@@ -572,7 +573,7 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
           links.push(sheetId);
           numOfEmpty = 0;
         } catch(e){
-          log(`${e}\nSeems that link:\n${link}\ndoes not match pattern.`);
+          v>0&& log(`${e}\nSeems that link:\n${link}\ndoes not match pattern.`);
         }
       } else {
         ++ numOfEmpty;
@@ -587,28 +588,77 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
       try{
         return SpreadsheetApp.openById(sheetId);
       } catch(e){
-        log('When opening sheet with id\n', sheetId, '\ngot: ', e);
+        v>0&& log('When opening sheet with id\n', sheetId, '\ngot: ', e);
       }
     }
   );
 
   if ( ! srcSpreadsheets.length){
-    log('No source spreadsheets opened!'); 
+    v>0&& log('No source spreadsheets opened!'); 
     return 2;
   }
 
-  const foundRecords = searchRecords(srcSpreadsheets[0], 50, 6);
+  const foundRecords = searchRecords(srcSpreadsheets[0]);
+  log(Array.from(foundRecords.values().next().value[0].keys()));
+  
+  // retrieve existing records in raw data sheet
+  const existingRecords = getRecords(dataRange);
+  log( Array.from(existingRecords.values().next().value[0].keys()));
 
+  const dates = datesBetween(fromDate, toDate);
+  dates.map(d => log(new Date(d).toLocaleDateString('ro-RO')));
+
+  v>2&& log('merging records ...');
+  for (const dateStr of dates){
+    const foundDateRecords = foundRecords.get(dateStr);
+    const existingDateRecords = existingRecords.get(dateStr);
+    if (foundDateRecords && existingDateRecords){
+      v>1&& log(`Duplicates found on date ${new Date(dateStr).toLocaleDateString('ro-RO')}.`);
+      const mergedDateRecords = mergeDateRecords(foundDateRecords, existingDateRecords);
+      existingRecords.set(dateStr, mergedDateRecords);
+    } else if (foundDateRecords){
+      existingRecords.set(dateStr, foundDateRecords);
+    }
+  }
+
+  v>2&& log('resolving same-date-key conflicts...');
+  v>2&& log('updating raw data sheet...')
 
   if (!foundRecords.size)
-    log(`Found ${foundRecords.size} records in spreadsheet ${srcSpreadsheets[0].getName()}`);
+    v>1&& log(`No records found in spreadsheet ${srcSpreadsheets[0].getName()}`);
 
+v>1&& log('Procedure importData END');
 } // importData END
 
 
 
 // ----------Global functions (in makeReport scope)---------------
 
+/**
+ * Runs in O(n^2), unfortunately
+ * @param {Array} records_1 - of {
+ * @param {Array} records_2
+ * @returns {Array} merged
+ */
+function mergedDateRecords(records_1, records_2){
+  const merged = [];
+  for (const rec_1 of records_1){
+    for (const rec_2 of records_2)
+      if (areTheSame(rec_1, rec_2)) merged.push(rec_1);
+      else {
+        merged.push(rec_1);
+        merged.push(rec_2);
+      }
+  }
+  return merged;
+}
+
+function areTheSame(map_1, map_2){
+  for (const [k, v] of map_1)
+    if (v !== map_2.get(k))
+      return false;
+  return true;
+}
 
 /**
  * @param {Spreadsheet} spreadsheet
@@ -618,8 +668,11 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
  *      - {string} keys - dates (ISO 8601)
  *      - {Array} values - of {Map} records, like {'date'=>{Date}, 'ref'=>32, etc.} 
  */
-function searchRecords(spreadsheet, rowLim, colLim){
+function searchRecords(spreadsheet, rowLim=50, colLim=6){
   const records = new Map();
+
+  // measurements
+  const messages = new Map();
 
   // pattern to search against 
   const identifierRe = /=RIGHT\(CELL\("filename",A\d\),LEN\(CELL\("filename",A\d\)\)-FIND\("\]",CELL\("filename",A\d\)\)\)/;
@@ -643,38 +696,46 @@ function searchRecords(spreadsheet, rowLim, colLim){
         isValidRecord(record) && sheetRecords.push(record);
       }
     }
+    
 
-    // if some records were found, return them as a {Map} dictionary 
+    // if some records were found, add them to {Map} records 
     if (sheetRecords.length){
       // assume sheetName is a date string like '01.02.2020'; 
       const [d, m, y] = sheet.getName().split('.');
       const dateStr = new Date(+y, +m-1, +d).toJSON();
-      const recordMap = new Map();
-      const fields = ['ref', 'doc_type', 'descr', 'I_O_type', 'value'];
-      for (const field of fields) recordMap.set(field, []);
+      records.set(dateStr, []);
 
       sheetRecords.map(
         record => {
+          const recordMap = new Map();
           const [ref, doc_type, descr, input, output] = record;
-          recordMap.get('ref').push(ref);
-          recordMap.get('dec_type').push(doc_type);
-          recordMap.get('descr').push(descr);
+
+          recordMap.set('date', dateStr);
+          recordMap.set('ref', ref || null);
+          recordMap.set('doc_type', doc_type || null);
+          recordMap.set('descr', descr || null);
           if (input)
-            recordMap.get('I_O_type').push(1);
+            recordMap.set('I_O_type', 1);
           else if (output)
-            recordMap.get('I_O_type').push(0);
-          recordMap.get('value').push(input || output);
+            recordMap.set('I_O_type', 0);
+          recordMap.set('value', input || output || null);
+
+          records.get(dateStr).push(recordMap);
         }
       );
-
-      return records;
-
+     
     } else {
-      log(`No records found in sheet ${sheet.getName()}, in spreadsheet ${spreadsheet.getName()}`);
+      const message = 'Records not found';
+      if (messages.has(message))
+        messages.get(message).push({sheet: sheet.getName(), spreadsheet: spreadsheet.getName()})  
+      else
+        messages.set(message, []);
     }
   }
-  
 
+// log accumulated messages
+v>1&& messages.forEach((vals, mess) => log(mess, vals.length, JSON.stringify(vals)));
+return records;
 }
 
 /**
@@ -746,7 +807,6 @@ function getCompanies(sheet, records=10, fields=4){
     continue;
     }
   const company = new Map();
-  company.set('id', company_id);
   const alias = row[0];
   company.set('alias', alias);
   company.set('name', row[1]);
@@ -766,7 +826,6 @@ function getRecords(range){
   for (const row of rangeValues){
     const record = new Map();
     if (row.filter(v=>v!="").length){
-      record.set('id', i);
       const date = row[0].toJSON();
       record.set('date', date);
       record.set('ref', row[1]);
@@ -838,5 +897,6 @@ function replaceCurly(templateString, value){
 
 
 } // makeReport END
+
 
 
