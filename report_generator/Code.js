@@ -163,7 +163,7 @@ procedure === 'importData' && importData(
 // -------------------------- library --------------------------------
 
 function renderReport(fromDate, toDate, company, dataRecords){
-v>1&& log('Procedure renderReport begin');
+v>0&& log('Procedure renderReport begin');
 
 /**
  * Class Element - is a piece of sheet... (cell, range)
@@ -534,7 +534,7 @@ const report = new Report(fromDate, toDate, company, dataRecords, template)
 report.render(targetSpreadsheet);
 //================================================================
 
-v>1&& log('Procedure renderReport END');
+v>0&& log('Procedure renderReport END');
 } // renderReport END
 
 
@@ -549,7 +549,8 @@ v>1&& log('Procedure renderReport END');
  *      - dataLinks[row][column]: {string} like 'https://docs.google.com/spreadsheets/d/<< sheetId >>/edit#gid=xxxxxxxxxx';
  */
 function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
-  v>1&& log('Procedure importData begin');
+  v>0&& log('Procedure importData begin');
+  v>2&& log(`Company alias: ${company.get('alias')}.`);
 
   // tableName the prefix before '.' in field name, like tableName.fieldName
   const linkTableName = 'link';
@@ -598,16 +599,26 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
     return 2;
   }
 
-  const foundRecords = searchRecords(...srcSpreadsheets);
+  const foundRecords = new Map(); 
+  for (const sheet of srcSpreadsheets){
+    for (const [dateStr, record] of searchRecords(sheet)){
+      foundRecords.set(dateStr, record);
+    }
+  }
+
   if (!foundRecords.size)
     v>1&& log(`No records found in spreadsheet ${srcSpreadsheets[0].getName()}`);
+  else
+    v>2&& log(`Found ${foundRecords.size} day-records in spreadsheets: [${srcSpreadsheets.map(ss => ss.getName())}]`);
+
   
   // retrieve existing records in raw data sheet
-  const existingRecords = getRecords(dataRange);
+  const existingRecords = getRecords(sheetToImportTo.getRange('A2:F'));
+  v>2&& log(`${existingRecords.size} day-records exists in ${sheetToImportTo.getName()}`);
 
   const dates = datesBetween(fromDate, toDate);
+  v>2&& log(`Searching found-records between ${new Date(fromDate).toLocaleDateString('ro-RO')} and ${new Date(toDate).toLocaleDateString('ro-RO')}...`);
 
-  v>2&& log('merging records ...');
   for (const dateStr of dates){
     const foundDateRecords = foundRecords.get(dateStr);
     const existingDateRecords = existingRecords.get(dateStr);
@@ -649,7 +660,7 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
   rawDataRange.setValues(rawValues);
 
 
-v>1&& log('Procedure importData END');
+v>0&& log('Procedure importData END');
 } // importData END
 
 
@@ -682,6 +693,9 @@ function mergeDateRecords(records_1, records_2){
   return merged;
 }
 
+/**
+ * Compares two {Map} instances
+ */
 function areTheSame(map_1, map_2){
   for (const [k, v] of map_1.entries())
     if (v !== map_2.get(k)){
