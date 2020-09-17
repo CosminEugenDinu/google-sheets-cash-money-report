@@ -11,89 +11,8 @@ const REPORT_SPREADSHEET_ID = "1e0nIxg2pNLnnSPmKdmkRHS7cl7kVEj2G9CKBksXflEk";
 const INTERFACE_SHEET_NAME = "Interface";
 const SETTINGS_SHEET_NAME = "settings";
 const RAWDATA_SHEET_SUFFIX = "_rawdata";
-/*
-const LABEL_STYLE = {fontSize:8, horizontalAlignment:'center', verticalAlignment:'middle', background:'lightgray', borders:[true, true, true, true, true, true]};
-
-const TEMPLATE = {
-  _layoutRange:[1,1,50,6],
-  _columnWidths:[75,80,20,250,80,80],
-  _rowHeight:15,
-  companyName:{
-    label_element:{cell:[2,2], value:"Societatea",
-      style:{fontSize:8, fontWeight:"bold", horizontalAlignment:'left'}},
-    target_element:{cell:[2,4]}},
-  tax_id:{
-    label_element:{cell:[3,2], value:"CUI",
-      style:{fontSize:8, fontWeight:'bold', horizontalAlignment:'left'}},
-    target_element:{cell:[3,4],
-      style:{horizontalAlignment:'left'}}},
-  reg_num:{
-    label_element:{cell:[4,2], value:"Nr. Reg. Com.:", 
-      style:{fontSize:8, fontWeight:'bold', horizontalAlignment:'left'}},
-    target_element:{cell:[4,4]}},
-  title:{
-    label_element:{cell:[8,2], value:"REGISTRUL DE CASA", offset:[2,4],
-      style:{fontSize:12, fontWeight:'bold', horizontalAlignment:'center', verticalAlignment:'middle'}}},
-  document:{
-    label_element:{cell:[11,1], value:"Document", offset:[1, 3],
-      style:LABEL_STYLE}},
-  explanations:{
-    label_element:{cell:[11,4], value:"EXPLICATII", offset:[2,1],
-      style:LABEL_STYLE}},
-  input:{
-    label_element:{cell:[11,5], value:"INCASARI", offset:[2,1],
-      style:LABEL_STYLE}},
-  output:{
-    label_element:{cell:[11,6], value:"PLATI", offset:[2,1],
-      style:LABEL_STYLE}},
-  date:{
-    label_element:{cell:[12,1], value:"DATA",
-      style:LABEL_STYLE}},
-  ref:{
-    label_element:{cell:[12,2], value: "NR",
-      style:LABEL_STYLE}},
-  doc_type:{
-    label_element:{cell:[12,3], value:"TIP",
-    style:LABEL_STYLE}},
-  previous_balance:{
-    label_element:{cell:[13,4], value:"SOLD LUNA/ZIUA PRECEDENTA"},
-    target_element:{cell:[13,5]}},
-  record:{
-    date:{
-      target_element:{cell:[14,1]},
-    },
-    ref:{
-      target_element:{cell:[14,2]},
-    },
-    doc_type:{
-      target_element:{cell:[14,3]},
-    },
-    descr:{
-      target_element:{cell:[14,4]},
-    },
-    input:{
-      target_element:{cell:[14,5]},
-    },
-    output:{
-      target_element:{cell:[14,6]},
-    }
-  },
-  total:{
-    label_element:{cell:[14,4],value:"Total la data de {}:",
-      style:LABEL_STYLE}},
-  day_balance:{
-    label_element:{cell:[15,4],value:"Sold la data de {}:",
-      style:LABEL_STYLE}},
-  body:{
-    frame_element:{cell:[13,1], extent:[3,6],
-      style:{borders:[null, true, true, true, false, false]}},
-  },
-  
-};
-*/
 
 const TEMPLATE = defaultTemplate();
-
 
 // instantiate log function
 const log = Log(REPORT_GENERATOR_SPREADSHEET_ID, 0, [10,5]);
@@ -123,6 +42,7 @@ updateRawDataSheetNames(rawDataSheets, computedRawDataSheetNames);
 const procedure = interface.getSheetValues(8,1,1,1)[0][0];
 const companyAlias = interface.getSheetValues(8,2,1,1)[0][0];
 const [fromDate, toDate] = interface.getSheetValues(8,3,1,2)[0];
+
 const verbosity = interface.getSheetValues(8,5,1,1)[0][0];
 // v=0 - critical, v=1 - informal, v=2 - too verbose
 const v = +verbosity;
@@ -507,6 +427,7 @@ class Report{
      */
 
     // delete existing sheets except first
+    v>2&& log(`Deleting existing report sheets except first`);
     targetSpreadsheet.getSheets().forEach(sheet =>{
       if (sheet.getIndex() === 1) 
         // cover sheet 
@@ -516,6 +437,8 @@ class Report{
     }
     );
     const dates = datesBetween(fromDate, toDate);
+    v>2&& log(`Rendering reports between ${fromDate.toLocaleDateString('ro-RO')} and ${toDate.toLocaleDateString('ro-RO')}`);
+
     let sheetIndex = 1
     for (const date of dates){
       const dayTrades = dataRecords.get(date);
@@ -523,6 +446,7 @@ class Report{
       const sheet = targetSpreadsheet.insertSheet(sheetIndex++);
       const dayReport = new DailyReport(date, company, dayTrades);
       dayReport.render(sheet, this.template);
+      v>2&& log(`Day report ${new Date(date).toLocaleDateString('ro-RO')} rendered!`);
     }
 
     return;
@@ -948,7 +872,7 @@ function defaultTemplate(){
 
   const TEMPLATE = {
     _layoutRange:[1,1,50,6],
-    _columnWidths:[75,80,20,250,80,80],
+    _columnWidths:[75,80,30,250,80,80],
     _rowHeight:15,
     companyName:{
       label_element:{cell:[2,2], value:"Societatea",
