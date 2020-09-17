@@ -598,14 +598,12 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
     return 2;
   }
 
-  const foundRecords = searchRecords(srcSpreadsheets[0]);
- // log(Array.from(foundRecords.values().next().value[0].keys()));
+  const foundRecords = searchRecords(...srcSpreadsheets);
   if (!foundRecords.size)
     v>1&& log(`No records found in spreadsheet ${srcSpreadsheets[0].getName()}`);
   
   // retrieve existing records in raw data sheet
   const existingRecords = getRecords(dataRange);
-  //log( Array.from(existingRecords.values().next().value[0].keys()));
 
   const dates = datesBetween(fromDate, toDate);
 
