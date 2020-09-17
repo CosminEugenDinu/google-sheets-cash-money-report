@@ -599,14 +599,15 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
   }
 
   const foundRecords = searchRecords(srcSpreadsheets[0]);
-  log(Array.from(foundRecords.values().next().value[0].keys()));
+ // log(Array.from(foundRecords.values().next().value[0].keys()));
+  if (!foundRecords.size)
+    v>1&& log(`No records found in spreadsheet ${srcSpreadsheets[0].getName()}`);
   
   // retrieve existing records in raw data sheet
   const existingRecords = getRecords(dataRange);
-  log( Array.from(existingRecords.values().next().value[0].keys()));
+  //log( Array.from(existingRecords.values().next().value[0].keys()));
 
   const dates = datesBetween(fromDate, toDate);
-  dates.map(d => log(new Date(d).toLocaleDateString('ro-RO')));
 
   v>2&& log('merging records ...');
   for (const dateStr of dates){
@@ -614,6 +615,7 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
     const existingDateRecords = existingRecords.get(dateStr);
     if (foundDateRecords && existingDateRecords){
       v>1&& log(`Duplicates found on date ${new Date(dateStr).toLocaleDateString('ro-RO')}.`);
+      v>2&& log('resolving same-date-key conflicts...');
       const mergedDateRecords = mergeDateRecords(foundDateRecords, existingDateRecords);
       existingRecords.set(dateStr, mergedDateRecords);
     } else if (foundDateRecords){
@@ -621,11 +623,33 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
     }
   }
 
-  v>2&& log('resolving same-date-key conflicts...');
   v>2&& log('updating raw data sheet...')
+  const rawValues = [];
+  const keyDates = Array.from(existingRecords.keys()).sort();
+  keyDates.forEach(
+    dateStr => {
+      for (const record of existingRecords.get(dateStr)){ 
+        rawValues.push(
+          [new Date(dateStr),
+          record.get('ref'),
+          record.get('doc_type'),
+          record.get('descr'),
+          record.get('I_O_type'),
+          record.get('value')]
+        );
+      }
+    }
+  );
 
-  if (!foundRecords.size)
-    v>1&& log(`No records found in spreadsheet ${srcSpreadsheets[0].getName()}`);
+  const rawDataRange = sheetToImportTo.getRange(2, 1, rawValues.length, rawValues[0].length);
+  // delete all existing records
+  sheetToImportTo.getRange('A2:F').clear();
+  v>2&& log(`Deleted all 'A2:F' values from sheet ${sheetToImportTo.getName()}!`); 
+  // writing new values
+  
+  v>2&& log(`Writing new values...`);
+  rawDataRange.setValues(rawValues);
+
 
 v>1&& log('Procedure importData END');
 } // importData END
@@ -636,27 +660,42 @@ v>1&& log('Procedure importData END');
 
 /**
  * Runs in O(n^2), unfortunately
- * @param {Array} records_1 - of {
+ * @param {Array} records_1 
  * @param {Array} records_2
  * @returns {Array} merged
  */
-function mergedDateRecords(records_1, records_2){
+function mergeDateRecords(records_1, records_2){
   const merged = [];
-  for (const rec_1 of records_1){
-    for (const rec_2 of records_2)
-      if (areTheSame(rec_1, rec_2)) merged.push(rec_1);
-      else {
-        merged.push(rec_1);
-        merged.push(rec_2);
+  // maps identical objects from records_1 and records_2 and vice-versa
+  const rec1_rec2 = [];
+  const rec2_rec1 = [];
+  
+  let i = 0, j = 0;
+  while(i < records_1.length){
+    while(j < records_2.length){
+      if (areTheSame(records_1[i], records_2[j])){
+        rec1_rec2.push(j);
+        rec2_rec1.push(i);
+      } else {
+        rec1_rec2.push(-1);
+        rec2_rec1.push(-1);
       }
+      ++j;
+    }
+    ++i;
   }
+
+
+  v>2&& log(`Merging different records:\n${Array.from(rec_1.values())}\n${Array.from(rec_2.values())}`);
   return merged;
 }
 
 function areTheSame(map_1, map_2){
-  for (const [k, v] of map_1)
-    if (v !== map_2.get(k))
+  for (const [k, v] of map_1.entries())
+    if (v !== map_2.get(k)){
+      v>2&& log(`${typeof(v)} ${v} is not the same as ${typeof(map_2.get(k))} ${map_2.get(k)}`);
       return false;
+    }
   return true;
 }
 
