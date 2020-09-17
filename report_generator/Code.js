@@ -666,34 +666,27 @@ v>1&& log('Procedure importData END');
  */
 function mergeDateRecords(records_1, records_2){
   const merged = [];
-  // maps identical objects from records_1 and records_2 and vice-versa
-  const rec1_rec2 = [];
-  const rec2_rec1 = [];
-  
-  let i = 0, j = 0;
-  while(i < records_1.length){
-    while(j < records_2.length){
-      if (areTheSame(records_1[i], records_2[j])){
-        rec1_rec2.push(j);
-        rec2_rec1.push(i);
-      } else {
-        rec1_rec2.push(-1);
-        rec2_rec1.push(-1);
+  records_1.map(map1 => {
+    let alsoInRecords_2 = false;
+    for (const map2 of records_2)
+      if (areTheSame(map1, map2)){
+        v>2&& log(`Record ${Array.from(map1.values())} is duplicate, so skipped`); 
+        alsoInRecords_2 = true;
+        break;
       }
-      ++j;
-    }
-    ++i;
+    if (! alsoInRecords_2)
+      merged.push(map1);
   }
-
-
-  v>2&& log(`Merging different records:\n${Array.from(rec_1.values())}\n${Array.from(rec_2.values())}`);
+  );
+  records_2.map(
+    map2 => merged.push(map2)
+  );
   return merged;
 }
 
 function areTheSame(map_1, map_2){
   for (const [k, v] of map_1.entries())
     if (v !== map_2.get(k)){
-      v>2&& log(`${typeof(v)} ${v} is not the same as ${typeof(map_2.get(k))} ${map_2.get(k)}`);
       return false;
     }
   return true;
