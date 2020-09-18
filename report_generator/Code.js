@@ -197,17 +197,18 @@ Element._supportedTypes = Array.from(Element._typesProps.keys());
 
 /**
  * 
+ * @property {Array} dayValues - of {Map} record; day records retrieved by date key from records
  */
 class DailyReport {
   /**
    * @param {string} date
    * @param {Map} company
-   * @param {Array} dayValues - of {Map} record; day records retrieved by date key from records
+   * @param {Map} dataRecords - reference to all values
    */
-  constructor(date, company, dayValues){
+  constructor(date, company, dataRecords){
     this.date = new Date(date);
     this.company = company;
-    this.dayValues = dayValues;
+    this.dayValues = dataRecords.get(date);
   }
   
   setColumnWidths(sheet, widths){
@@ -460,7 +461,7 @@ class Report{
       const dayTrades = dataRecords.get(date);
       if (!dayTrades) continue;
       const sheet = targetSpreadsheet.insertSheet(sheetIndex++);
-      const dayReport = new DailyReport(date, company, dayTrades);
+      const dayReport = new DailyReport(date, company, dataRecords);
       dayReport.render(sheet, this.template);
       v>2&& log(`Day report ${new Date(date).toLocaleDateString('ro-RO')} rendered!`);
     }
