@@ -511,19 +511,24 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
   })(dataLinks)
 
   // list of source Spreadsheets opened by ids;
-  const srcSpreadsheets = sheetIds.map(
-    sheetId => {
+  const srcSpreadsheets = sheetIds.reduce(
+    (spreadsheets, sheetId)  => {
       try{
-        return SpreadsheetApp.openById(sheetId);
+        const spreadsheet = SpreadsheetApp.openById(sheetId);
+        spreadsheets.push(spreadsheet);
+        return spreadsheets;
       } catch(e){
         v>0&& log('When opening sheet with id\n', sheetId, '\ngot: ', e);
+        return spreadsheets;
       }
-    }
+    }, []
   );
 
   if ( ! srcSpreadsheets.length){
     v>0&& log('No source spreadsheets opened!'); 
     return 2;
+  } else {
+    v>1&& log(`Spreadsheets opened ${srcSpreadsheets.length}, [${srcSpreadsheets.map(ss => ss.getName())}]`);
   }
 
   const foundRecords = new Map(); 
