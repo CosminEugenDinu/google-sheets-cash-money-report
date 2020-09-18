@@ -202,12 +202,12 @@ class DailyReport {
   /**
    * @param {string} date
    * @param {Map} company
-   * @param {Array} dataValues - of {Map} record
+   * @param {Array} dayValues - of {Map} record; day records retrieved by date key from records
    */
-  constructor(date, company, dataValues){
+  constructor(date, company, dayValues){
     this.date = new Date(date);
     this.company = company;
-    this.dataValues = dataValues;
+    this.dayValues = dayValues;
   }
   
   setColumnWidths(sheet, widths){
@@ -268,8 +268,8 @@ class DailyReport {
 
   render(toSheet, template){
 
-    if (!this.dataValues)
-      throw new TypeError(`Cannot render {DailyReport} instance if data values is ${this.dataValues}`);
+    if (!this.dayValues)
+      throw new TypeError(`Cannot render {DailyReport} instance if data values is ${this.dayValues}`);
     
     toSheet.setName(this.date.toLocaleDateString('ro-RO'));
     this.setColumnWidths(toSheet, template._columnWidths);
@@ -327,7 +327,7 @@ class DailyReport {
     dataUiMap.set('descr', 'descr');
 
     let rowNum = uiRecord.get('date').get('target_element').cell[0] - 1;
-    for (const record of this.dataValues){
+    for (const record of this.dayValues){
       ++ rowNum;
 
       for (const [dataKey, value] of record){
@@ -385,7 +385,7 @@ class DailyReport {
       modifiedElements.set('total', total);
       modifiedElements.set('day_balance', day_balance);
 
-      const numRecords = this.dataValues.length;
+      const numRecords = this.dayValues.length;
 
       // render modified elements are restore their default values
       for (const [parent, element] of modifiedElements){
