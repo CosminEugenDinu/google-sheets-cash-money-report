@@ -202,12 +202,12 @@ class DailyReport {
   /**
    * @param {string} date
    * @param {Map} company
-   * @param {Array} dataValues
+   * @param {Array} dataValues - of {Map} record
    */
   constructor(date, company, dataValues){
     this.date = new Date(date);
     this.company = company;
-    this.values = dataValues;
+    this.dataValues = dataValues;
   }
   
   setColumnWidths(sheet, widths){
@@ -268,7 +268,8 @@ class DailyReport {
 
   render(toSheet, template){
 
-    if (!this.values) new TypeError(`Cannot render {DailyReport} instance if data values is ${this.values}`);
+    if (!this.dataValues)
+      throw new TypeError(`Cannot render {DailyReport} instance if data values is ${this.dataValues}`);
     
     toSheet.setName(this.date.toLocaleDateString('ro-RO'));
     this.setColumnWidths(toSheet, template._columnWidths);
@@ -284,18 +285,33 @@ class DailyReport {
     tree.get('companyName').get('target_element').value = company.get('name');
     tree.get('tax_id').get('target_element').value = company.get('tax_id');
     tree.get('reg_num').get('target_element').value = company.get('reg_num');
+    
 
-    // change label according to date (if date is 1st or not)
-    let label = tree.get('previous_balance').get('label_element');
-    if (this.date.getDate() === 1)
-      label.value = label.value.replace(/\/ziua/i, '');
-    else 
-      label.value = label.value.replace(/luna\//i, '');
-    // replace '{}' with date in corresponding labels
-    label = tree.get('total').get('label_element');
-    label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
-    label = tree.get('day_balance').get('label_element');
-    label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
+    ((group=tree.get('previous_balance')) => {
+      const label = group.get('label_element');
+      const target = group.get('target_element');
+
+      // change label according to date (if date is 1st or not)
+      if (this.date.getDate() === 1)
+        label.value = label.value.replace(/\/ziua/i, '');
+      else 
+        label.value = label.value.replace(/luna\//i, '');
+
+      target.value = 'Prev target val';
+    })();
+
+    ((group=tree.get('total')) => {
+      const label = group.get('label_element');
+      const target = group.get('target_element');
+      // replace '{}' with date in corresponding labels
+      label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
+    })();
+
+    ((group=tree.get('day_balance')) => {
+      const label = group.get('label_element');
+      const target = group.get('target_element');
+      label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
+    })();
 
     // render all elements that has a value till now 
     for (const [key, element] of elements){
@@ -311,7 +327,7 @@ class DailyReport {
     dataUiMap.set('descr', 'descr');
 
     let rowNum = uiRecord.get('date').get('target_element').cell[0] - 1;
-    for (const record of this.values){
+    for (const record of this.dataValues){
       ++ rowNum;
 
       for (const [dataKey, value] of record){
@@ -369,7 +385,7 @@ class DailyReport {
       modifiedElements.set('total', total);
       modifiedElements.set('day_balance', day_balance);
 
-      const numRecords = this.values.length;
+      const numRecords = this.dataValues.length;
 
       // render modified elements are restore their default values
       for (const [parent, element] of modifiedElements){
@@ -941,10 +957,14 @@ function defaultTemplate(){
     },
     total:{
       label_element:{cell:[14,4],value:"Total la data de {}:",
-        style:LABEL_STYLE}},
+        style:LABEL_STYLE},
+      target_element:{cell:[14,5]}
+    },
     day_balance:{
       label_element:{cell:[15,4],value:"Sold la data de {}:",
-        style:LABEL_STYLE}},
+        style:LABEL_STYLE},
+      target_element:{cell:[15,5]}
+    },
     body:{
       frame_element:{cell:[13,1], extent:[3,6],
         style:{borders:[null, true, true, true, false, false]}},
