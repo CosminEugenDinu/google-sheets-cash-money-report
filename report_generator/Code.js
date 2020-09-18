@@ -209,6 +209,11 @@ class DailyReport {
     this.date = new Date(date);
     this.company = company;
     this.dayValues = dataRecords.get(date);
+    const jsonDateRe = /^(\d{4}-\d{2}-)(\d{2})(T[\d:.]*Z)$/;
+    if ( ! date.match(jsonDateRe))
+      throw new TypeError(`JSON date str ${jd} does not match`);
+    this.prevDateStr = date.replace(jsonDateRe, (m,g1,day,g3) => g1+(+day-1)+g3);
+    //this.previous_balance = this.totalTill(date);
   }
   
   setColumnWidths(sheet, widths){
