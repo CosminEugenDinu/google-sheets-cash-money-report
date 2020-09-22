@@ -113,6 +113,9 @@ class Element {
         `supported types are: ${this.supportedTypes}`);
     this._type = typeKey;
 
+    // reference to template element object
+    this._templateElement = elem;
+
     for (const prop of Element._typesProps.get(typeKey))
       this[prop] = null;
    
@@ -124,6 +127,10 @@ class Element {
         }
     }
 
+  }
+
+  get templateElement(){
+    return this._templateElement;
   }
 
   get type(){
@@ -285,7 +292,6 @@ class DailyReport {
     tree.get('tax_id').get('target_element').value = company.get('tax_id');
     tree.get('reg_num').get('target_element').value = company.get('reg_num');
     
-
     ((group=tree.get('previous_balance')) => {
       const label = group.get('label_element');
       const target = group.get('target_element');
@@ -413,13 +419,19 @@ class DailyReport {
       // insert an empty row before modifiedElements
     }
 */
+    const numRecords = this.dayValues.length;
+    // {Map} record
+    for (const record of records){
+      const recordElement = new Element(uiRecord.
+    }
+
     const renderedElements = new Map(); 
     // render all elements that has a value 
     for (const [key, element] of elements){
       const rendered = element.render(toSheet);
       renderedElements.set(DailyReport.keyFromCell(rendered.cell), rendered);
       }
-    log(Array.from(renderedElements.keys()));
+
     return renderedElements;
   }
 
@@ -960,17 +972,17 @@ function defaultTemplate(){
       }
     },
     total:{
-      label_element:{cell:[14,4],value:"Total la data de {}:",
-        style:LABEL_STYLE},
-      target_element:{cell:[14,5]}
-    },
-    day_balance:{
-      label_element:{cell:[15,4],value:"Sold la data de {}:",
+      label_element:{cell:[15,4],value:"Total la data de {}:",
         style:LABEL_STYLE},
       target_element:{cell:[15,5]}
     },
+    day_balance:{
+      label_element:{cell:[16,4],value:"Sold la data de {}:",
+        style:LABEL_STYLE},
+      target_element:{cell:[16,5]}
+    },
     body:{
-      frame_element:{cell:[13,1], extent:[3,6],
+      frame_element:{cell:[13,1], extent:[4,6],
         style:{borders:[null, true, true, true, false, false]}},
     },
   };
