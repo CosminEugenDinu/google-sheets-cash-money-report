@@ -121,7 +121,9 @@ class Element {
    
     for (const p in elem){
       if (typesProps.get(this._type).includes(p)){
-        this[p] = elem[p];
+        // cell property is a reference to an array, so copy it
+        if (p === 'cell') this[p] = [...elem[p]];
+        else this[p] = elem[p];
       } else {
         throw new TypeError(`Property ${p} is not a supported by element type ${this._type}`);
         }
@@ -170,7 +172,7 @@ class Element {
     if (!this.cell) throw new TypeError(`Cannot render element when element.cell=${cell}`);
 
     let range = sheet.getRange(...this.cell);
-    range.clear();
+   // range.clear();
     if (this.type === 'target_element'){
       if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
       range.setValue(this.value);
@@ -292,33 +294,8 @@ class DailyReport {
     tree.get('tax_id').get('target_element').value = company.get('tax_id');
     tree.get('reg_num').get('target_element').value = company.get('reg_num');
     
-    ((group=tree.get('previous_balance')) => {
-      const label = group.get('label_element');
-      const target = group.get('target_element');
 
-      // change label according to date (if date is 1st or not)
-      if (this.date.getDate() === 1)
-        label.value = label.value.replace(/\/ziua/i, '');
-      else 
-        label.value = label.value.replace(/luna\//i, '');
-
-      target.value = 'Prev target val';
-    })();
-
-    ((group=tree.get('total')) => {
-      const label = group.get('label_element');
-      const target = group.get('target_element');
-      // replace '{}' with date in corresponding labels
-      label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
-    })();
-
-    ((group=tree.get('day_balance')) => {
-      const label = group.get('label_element');
-      const target = group.get('target_element');
-      label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
-    })();
-
-
+/*
     const uiRecord = tree.get('record');
 
     const dataUiMap = new Map();
@@ -328,7 +305,6 @@ class DailyReport {
     dataUiMap.set('descr', 'descr');
 
     let rowNum = uiRecord.get('date').get('target_element').cell[0] - 1;
-/*
     for (const record of this.dayValues){
       ++ rowNum;
 
@@ -419,16 +395,87 @@ class DailyReport {
       // insert an empty row before modifiedElements
     }
 */
+
+/*
+    const defaultRecordElements = [
+      tree.get('record').get('date').get('target_element'),
+      tree.get('record').get('ref').get('target_element'),
+      tree.get('record').get('doc_type').get('target_element'),
+      tree.get('record').get('descr').get('target_element')
+    ];
+*/
+    ((group=tree.get('previous_balance')) => {
+      const label = group.get('label_element');
+      const target = group.get('target_element');
+
+      // change label according to date (if date is 1st or not)
+      if (this.date.getDate() === 1)
+        label.value = label.value.replace(/\/ziua/i, '');
+      else 
+        label.value = label.value.replace(/luna\//i, '');
+
+      target.value = 'Prev target val';
+    })();
+
+    // number of sheet row - retrieved from an record element ('date');
+    let rowNum = tree.get('record').get('date').get('target_element').cell[0] - 1;
     const numRecords = this.dayValues.length;
+    const frame = tree.get('body').get('frame_element');
+    let i = 0;
     // {Map} record
-    for (const record of records){
-      const recordElement = new Element(uiRecord.
+    for (const record of this.dayValues){
+      ++rowNum
+      
+      for (const [parentKey, elementType] of tree.get('record')){
+        i++
+        const defaultElement = elementType.get('target_element');
+        const newRecElem = new Element('target_element', defaultElement.templateElement);
+        // make a copy (a new record element)
+        // writing corresponding values from data record (dayValues)
+        if (parentKey === 'date') newRecElem.value = record.get('date');
+        if (parentKey === 'ref') newRecElem.value = record.get('ref');
+        if (parentKey === 'doc_type') newRecElem.value = record.get('doc_type');
+        if (parentKey === 'descr') newRecElem.value = record.get('descr'); 
+        //updating cell position
+        newRecElem.cell[0] = defaultElement.cell[0];
+        //updating cell position
+        defaultElement.cell[0] += 1;
+        // push new element (replacing existing key)
+        //elements.set(DailyReport.keyFromCell(newRecElem.cell), newRecElem);
+        elements.set(`${i+1}`, newRecElem);
+        // push updated key
+        //elements.set(DailyReport.keyFromCell(defaultElement.cell), defaultElement);
+        elements.set(`${i+2}`, defaultElement);
+      }
+
+      // expand body frame accordingly
+      //frame.extent[0] += 1;
     }
+
+    ((group=tree.get('total')) => {
+      const label = group.get('label_element');
+      // replace '{}' with date in corresponding labels
+      label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
+      label.cell[0] += numRecords;
+      const target = group.get('target_element');
+      target.cell[0] += numRecords;
+    })();
+
+    ((group=tree.get('day_balance')) => {
+      const label = group.get('label_element');
+      label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
+      label.cell[0] += numRecords;
+      const target = group.get('target_element');
+      target.cell[0] += numRecords;
+    })();
+
+    frame.extent[0] += numRecords;
 
     const renderedElements = new Map(); 
     // render all elements that has a value 
     for (const [key, element] of elements){
       const rendered = element.render(toSheet);
+      log('rendered:', key, element.value);
       renderedElements.set(DailyReport.keyFromCell(rendered.cell), rendered);
       }
 
