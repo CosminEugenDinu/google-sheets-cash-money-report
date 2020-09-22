@@ -180,7 +180,7 @@ class Element {
     for (const prop in this.style)
       Element.setProperty(range, prop, this.style[prop]);
 
-    return range
+    return this; 
   }
 
 }
@@ -219,8 +219,9 @@ class DailyReport {
 
   /**
    * Converts tuple array like [1, 2] into {string} key '1:2'
+   * @param {{x: Number, y: Number}[]}
    */
-  static keyFromCell(x, y){
+  static keyFromCell([x, y]){
     const key = `${x}:${y}`;
     return key;
   }
@@ -244,7 +245,6 @@ class DailyReport {
    *   that corresponds to 'cell' property of {Element}
    */
   static objToMap(obj, leafKeys, leaves=new Map()){
-
     const mapTree = new Map();
 
     for (const key in obj){
@@ -253,8 +253,7 @@ class DailyReport {
         // if is a leaf
         const element = new Element(key, obj[key]);
         mapTree.set(key, element);
-        const [x, y] = obj[key].cell;
-        leaves.set(DailyReport.keyFromCell(x, y), element); 
+        leaves.set(DailyReport.keyFromCell(obj[key].cell), element); 
       } 
       // does not recurses on arrays; are passed over
       else if (isObject(obj[key])){
@@ -279,7 +278,7 @@ class DailyReport {
 
     const leafKeys = Element.getSupportedTypes();
     // {Map} tree - having {Element} leaves
-    // {Map} elements - having key=DailyReport.keyFromCell(x,y), and value is {Element} leaf 
+    // {Map} elements - having key=DailyReport.keyFromCell([x,y]), and value is {Element} leaf 
     const [tree, elements] = DailyReport.objToMap(template, leafKeys);
     // populate headers (general info displayed on top of report sheet)
     tree.get('companyName').get('target_element').value = company.get('name');
@@ -313,10 +312,6 @@ class DailyReport {
       label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
     })();
 
-    // render all elements that has a value till now 
-    for (const [key, element] of elements){
-      element.render(toSheet);
-      }
 
     const uiRecord = tree.get('record');
 
@@ -327,6 +322,7 @@ class DailyReport {
     dataUiMap.set('descr', 'descr');
 
     let rowNum = uiRecord.get('date').get('target_element').cell[0] - 1;
+/*
     for (const record of this.dayValues){
       ++ rowNum;
 
@@ -415,11 +411,19 @@ class DailyReport {
       
 
       // insert an empty row before modifiedElements
-
     }
-
-    
+*/
+    const renderedElements = new Map(); 
+    // render all elements that has a value 
+    for (const [key, element] of elements){
+      const rendered = element.render(toSheet);
+      renderedElements.set(DailyReport.keyFromCell(rendered.cell), rendered);
+      }
+    log(Array.from(renderedElements.keys()));
+    return renderedElements;
   }
+
+
 }
 
 
