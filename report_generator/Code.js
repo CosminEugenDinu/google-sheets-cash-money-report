@@ -121,8 +121,8 @@ class Element {
    
     for (const p in elem){
       if (typesProps.get(this._type).includes(p)){
-        // cell property is a reference to an array, so copy it
-        if (p === 'cell') this[p] = [...elem[p]];
+        // if property is a reference to an array, so copy it
+        if (Array.isArray(elem[p])) this[p] = [...elem[p]];
         else this[p] = elem[p];
       } else {
         throw new TypeError(`Property ${p} is not a supported by element type ${this._type}`);
@@ -134,7 +134,8 @@ class Element {
   get templateElement(){
     return this._templateElement;
   }
- type(){
+
+  get type(){
     return this._type;
   }
 
@@ -155,16 +156,6 @@ class Element {
     const key = `${x}:${y}`;
     return key;
   }
-  
-  /**
-   * Converts {string} key (e.g. '1:2') into tuple array (e.g. [1, 2])
-   */
-/*
-  get cellKey(key){
-    const tuple = key.split(':').map(letter=>+letter);
-    return tuple // cell 
-  }
-*/
 
   /**
    * Sets properties on range objects (e.g. set borders on cells in sheet)
@@ -311,15 +302,16 @@ class DailyReport {
     })();
 
     // number of sheet row - retrieved from an record element ('date');
-    let rowNum = tree.get('record').get('date').get('target_element').cell[0] - 1;
+    //let rowNum = tree.get('record').get('date').get('target_element').cell[0] - 1;
     const numRecords = this.dayValues.length;
-    let i = 0;
+    const newElements = new Map();
+    //let i = 0;
     // {Map} record
     for (const record of this.dayValues){
-      ++rowNum
+      //++rowNum
       
       for (const [parentKey, elementType] of tree.get('record')){
-        i++
+        //i++
         const defaultElement = elementType.get('target_element');
         const newRecElem = new Element('target_element', defaultElement.templateElement);
         // make a copy (a new record element)
@@ -333,9 +325,10 @@ class DailyReport {
         //updating cell position
         defaultElement.cell[0] += 1;
         // push new element (replacing existing key)
-        elements.set(newRecElem.keyCell+i+1, newRecElem);
+        elements.set(newRecElem.keyCell, newRecElem);
+        //elements.set(`${i+1}`, newRecElem);
         // push updated key
-        elements.set(defaultElement.keyCell+i+2, defaultElement);
+        elements.set(defaultElement.keyCell, defaultElement);
       }
 
     }
@@ -351,29 +344,27 @@ class DailyReport {
       // replace '{}' with date in corresponding labels
       label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
       label.cell[0] += numRecords;
-      // update location key in elements
-      //elements.set(label.keyCell, label);
+      elements.set(label.keyCell, label);
       const target = group.get('target_element');
       target.cell[0] += numRecords;
-      //elements.set(target.keyCell, target);
+      elements.set(target.keyCell, target);
     })();
 
     ((group=tree.get('day_balance')) => {
       const label = group.get('label_element');
       label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
       label.cell[0] += numRecords;
-      //elements.set(label.keyCell, label);
+      elements.set(label.keyCell, label);
       const target = group.get('target_element');
       target.cell[0] += numRecords;
-      //elements.set(target.keyCell, target);
+      elements.set(target.keyCell, target);
     })();
 
 
     // render all elements that has a value 
     for (const [key, element] of elements){
-      log('element.cell:', element.cell, 'elements key:', key, 'element.value:', element.value);
       const rendered = element.render(toSheet);
-      //log('rendered:', key, element.value);
+      log('rendered:', key, element.value);
       }
 
     return elements;
