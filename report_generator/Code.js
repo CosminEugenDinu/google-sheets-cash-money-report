@@ -232,7 +232,23 @@ class DailyReport {
     if ( ! date.match(jsonDateRe))
       throw new TypeError(`JSON date str ${jd} does not match`);
     this.prevDateStr = date.replace(jsonDateRe, (m,g1,day,g3) => g1+(+day-1)+g3);
+
     this.previous_balance = calculateBalance(this.prevDateStr);
+
+    const [total_input, total_day_output] = this.dayValues.reduce(
+      (in_out, record) => {
+        if (record.get('I_O_type') === 1){
+          in_out[0] += record.get('value');
+        } else if (record.get('I_O_type') === 0) {
+          in_out[1] += record.get('value');
+        }
+        return in_out;
+      }
+    ,[this.previous_balance, 0]);
+
+    this.total_input = total_input; 
+    this.total_day_output = total_day_output; 
+    this.day_balance = total_input - total_day_output;
   }
   
   setColumnWidths(sheet, widths){
@@ -297,27 +313,20 @@ class DailyReport {
     ((group=tree.get('previous_balance')) => {
       const label = group.get('label_element');
       const target = group.get('target_element');
-
       // change label according to date (if date is 1st or not)
       if (this.date.getDate() === 1)
         label.value = label.value.replace(/\/ziua/i, '');
       else 
         label.value = label.value.replace(/luna\//i, '');
-
       target.value = this.previous_balance;
     })();
 
-    // number of sheet row - retrieved from an record element ('date');
-    //let rowNum = tree.get('record').get('date').get('target_element').cell[0] - 1;
     const numRecords = this.dayValues.length;
-    const newElements = new Map();
-    //let i = 0;
+
     // {Map} record
     for (const record of this.dayValues){
-      //++rowNum
       
       for (const [parentKey, elementType] of tree.get('record')){
-        //i++
         const defaultElement = elementType.get('target_element');
         const newRecElem = new Element('target_element', defaultElement.templateElement);
         // make a copy (a new record element)
@@ -352,15 +361,24 @@ class DailyReport {
       frame.extent[0] += numRecords;
     })();
 
-    ((group=tree.get('total')) => {
+    ((group=tree.get('day_total_label')) => {
       const label = group.get('label_element');
       // replace '{}' with date in corresponding labels
       label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
       label.cell[0] += numRecords;
       elements.set(label.keyCell, label);
-      const target = group.get('target_element');
-      target.cell[0] += numRecords;
-      elements.set(target.keyCell, target);
+    })();
+
+    ((group=tree.get('day_total_targets')) => {
+      const total_input = group.get('total_input').get('target_element');
+      total_input.cell[0] += numRecords;
+      total_input.value = this.total_input;
+      elements.set(total_input.keyCell, total_input);
+
+      const total_day_output = group.get('total_day_output').get('target_element');
+      total_day_output.cell[0] += numRecords;
+      total_day_output.value = this.total_day_output;
+      elements.set(total_day_output.keyCell, total_day_output);
     })();
 
     ((group=tree.get('day_balance')) => {
@@ -370,6 +388,7 @@ class DailyReport {
       elements.set(label.keyCell, label);
       const target = group.get('target_element');
       target.cell[0] += numRecords;
+      target.value = this.day_balance;
       elements.set(target.keyCell, target);
     })();
 
@@ -952,11 +971,17 @@ function defaultTemplate(){
         style: TARGET_STYLE},
       }
     },
-    total:{
+    day_total_label:{
       label_element:{cell:[15,4],value:"Total la data de {}:",
-        style:LABEL_STYLE},
-      target_element:{cell:[15,5]}
-      
+        style:LABEL_STYLE}
+    },
+    day_total_targets:{
+      total_input:{
+        target_element:{cell:[15,5]}
+      },
+      total_day_output:{
+        target_element:{cell:[15,6]}
+      }
     },
     day_balance:{
       label_element:{cell:[16,4],value:"Sold la data de {}:",
