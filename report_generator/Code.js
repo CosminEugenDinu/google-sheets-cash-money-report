@@ -228,10 +228,12 @@ class DailyReport {
     this.date = new Date(date);
     this.company = company;
     this.dayValues = dataRecords.get(date);
-    const jsonDateRe = /^(\d{4}-\d{2}-)(\d{2})(T[\d:.]*Z)$/;
-    if ( ! date.match(jsonDateRe))
-      throw new TypeError(`JSON date str ${jd} does not match`);
-    this.prevDateStr = date.replace(jsonDateRe, (m,g1,day,g3) => g1+(+day-1)+g3);
+
+    this.prevDateStr = ((today=this.date) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() -1);
+      return date.toJSON();
+    })();
 
     this.previous_balance = calculateBalance(this.prevDateStr);
 
@@ -429,16 +431,30 @@ class Report{
 
     return(
       (currentDateStr) => {
-      let total = 0;
-      for (const dateStr of sortedDates){
-        if (dateStr > currentDateStr)
-          return total;
-        const dayRecords = dataRecords.get(dateStr);
-        total += dayRecords.reduce((dayTotal, record) => {
-          if (record.get('I_O_type') === 1)
-            return dayTotal + record.get('value');
-          if (record.get('I_O_type') === 0)
-            return dayTotal - record.get('value');
+        if (! typeof currnetDateStr === 'string')
+          throw new TypeError(
+            `Typeof currentDateStr is ${typeof currentDateStr}. Expected string.`);
+        if (isNaN(new Date(currentDateStr)))
+          throw new TypeError(
+            `${typeof currentDateStr} ${currentDateStr} is not a valid date JSON string.`);
+
+        let total = 0;
+        for (const dateStr of sortedDates){
+          if (currentDateStr < dateStr)
+            return total;
+          const dayRecords = dataRecords.get(dateStr);
+          total += dayRecords.reduce((dayTotal, record) => {
+
+            const recordValue = record.get('value');
+            if (typeof recordValue !== 'number')
+              throw new TypeError(
+                `Expected Number! Typeof record value ${recordValue}: ${typeof recordValue}. `+
+                `Date key: ${dateStr}. Local Date: ${new Date(dateStr).toLocaleDateString('ro-RO')}`);
+
+            if (record.get('I_O_type') === 1)
+              return dayTotal + recordValue;
+            if (record.get('I_O_type') === 0)
+              return dayTotal - recordValue;
         }, 0);
       }
       return total;
