@@ -181,7 +181,7 @@ class Element {
     if (!this.cell) throw new TypeError(`Cannot render element when element.cell=${cell}`);
 
     let range = sheet.getRange(...this.cell);
-    range.clear();
+    //range.clear();
     if (this.type === 'target_element'){
       if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
       range.setValue(this.value);
@@ -222,8 +222,9 @@ class DailyReport {
    * @param {string} date
    * @param {Map} company
    * @param {Map} dataRecords - reference to all values
+   * @param {Function} calculateBalance - takes {string} date as arg and calculates balance till date
    */
-  constructor(date, company, dataRecords){
+  constructor(date, company, dataRecords, calculateBalance){
     this.date = new Date(date);
     this.company = company;
     this.dayValues = dataRecords.get(date);
@@ -231,7 +232,7 @@ class DailyReport {
     if ( ! date.match(jsonDateRe))
       throw new TypeError(`JSON date str ${jd} does not match`);
     this.prevDateStr = date.replace(jsonDateRe, (m,g1,day,g3) => g1+(+day-1)+g3);
-    //this.previous_balance = this.totalTill(date);
+    this.previous_balance = calculateBalance(this.prevDateStr);
   }
   
   setColumnWidths(sheet, widths){
@@ -303,7 +304,7 @@ class DailyReport {
       else 
         label.value = label.value.replace(/luna\//i, '');
 
-      target.value = 'Prev target val';
+      target.value = this.previous_balance;
     })();
 
     // number of sheet row - retrieved from an record element ('date');
@@ -387,17 +388,47 @@ class DailyReport {
 }
 
 
-
 class Report{
   constructor(fromDate, toDate, company, dataRecords, template){
     this.fromDate = fromDate;
     this.toDate = toDate;
     this.company = company;
     this.dataRecords = dataRecords;
+    const recordDates = Array.from(dataRecords.keys());
+    recordDates.sort();
+    this.recordDates = recordDates;
     this.template = template;
+  }
+
+  /**
+   * returns a closure to calculate balance till date
+   */
+  balanceCalculator(){
+    // closure variables
+    const sortedDates = this.recordDates;
+    const dataRecords = this.dataRecords;
+
+    return(
+      (currentDateStr) => {
+      let total = 0;
+      for (const dateStr of sortedDates){
+        if (dateStr > currentDateStr)
+          return total;
+        const dayRecords = dataRecords.get(dateStr);
+        total += dayRecords.reduce((dayTotal, record) => {
+          if (record.get('I_O_type') === 1)
+            return dayTotal + record.get('value');
+          if (record.get('I_O_type') === 0)
+            return dayTotal - record.get('value');
+        }, 0);
+      }
+      return total;
+      }
+    );
   }
   
   render(targetSpreadsheet, template){
+    
     /* for every date between fromDate and toDate:
      *   collect dataRecords and group by date in a {Map},
      *   generate an instance of {DailyReport},
@@ -424,7 +455,7 @@ class Report{
       const dayTrades = dataRecords.get(date);
       if (!dayTrades) continue;
       const sheet = targetSpreadsheet.insertSheet(sheetIndex++);
-      const dayReport = new DailyReport(date, company, dataRecords);
+      const dayReport = new DailyReport(date, company, dataRecords, this.balanceCalculator());
       dayReport.render(sheet, this.template);
       v>2&& log(`Day report ${new Date(date).toLocaleDateString('ro-RO')} rendered!`);
     }
@@ -853,7 +884,8 @@ function replaceCurly(templateString, value){
  */
 function defaultTemplate(){
 
-  const LABEL_STYLE = {fontSize:8, horizontalAlignment:'center', verticalAlignment:'middle', background:'lightgray', borders:[true, true, true, true, true, true]};
+  const LABEL_STYLE = {fontSize:8, horizontalAlignment:'center', verticalAlignment:'middle', background:'lightgray', borders:[null, null, null, null, false, false]};
+  const TARGET_STYLE = {borders:[null, null, null, null, false, false]};
 
   const TEMPLATE = {
     _layoutRange:[1,1,50,6],
@@ -916,13 +948,15 @@ function defaultTemplate(){
         target_element:{cell:[14,5]},
       },
       output:{
-        target_element:{cell:[14,6]},
+        target_element:{cell:[14,6],
+        style: TARGET_STYLE},
       }
     },
     total:{
       label_element:{cell:[15,4],value:"Total la data de {}:",
         style:LABEL_STYLE},
       target_element:{cell:[15,5]}
+      
     },
     day_balance:{
       label_element:{cell:[16,4],value:"Sold la data de {}:",
