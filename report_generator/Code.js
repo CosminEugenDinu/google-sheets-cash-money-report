@@ -134,8 +134,7 @@ class Element {
   get templateElement(){
     return this._templateElement;
   }
-
-  get type(){
+ type(){
     return this._type;
   }
 
@@ -146,6 +145,26 @@ class Element {
   static getSupportedTypes(){
     return Element._supportedTypes;
   }
+
+  /**
+   * Converts tuple array like [1, 2] into {string} key '1:2'
+   * @param {{x: Number, y: Number}[]}
+   */
+  get keyCell(){
+    const [x, y] = this.cell;
+    const key = `${x}:${y}`;
+    return key;
+  }
+  
+  /**
+   * Converts {string} key (e.g. '1:2') into tuple array (e.g. [1, 2])
+   */
+/*
+  get cellKey(key){
+    const tuple = key.split(':').map(letter=>+letter);
+    return tuple // cell 
+  }
+*/
 
   /**
    * Sets properties on range objects (e.g. set borders on cells in sheet)
@@ -172,7 +191,7 @@ class Element {
     if (!this.cell) throw new TypeError(`Cannot render element when element.cell=${cell}`);
 
     let range = sheet.getRange(...this.cell);
-   // range.clear();
+    range.clear();
     if (this.type === 'target_element'){
       if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
       range.setValue(this.value);
@@ -227,23 +246,6 @@ class DailyReport {
   }
 
   /**
-   * Converts tuple array like [1, 2] into {string} key '1:2'
-   * @param {{x: Number, y: Number}[]}
-   */
-  static keyFromCell([x, y]){
-    const key = `${x}:${y}`;
-    return key;
-  }
-
-  /**
-   * Converts {string} key (e.g. '1:2') into tuple array (e.g. [1, 2])
-   */
-  static cellFromKey(key){
-    const tuple = key.split(':').map(letter=>+letter);
-    return tuple // cell 
-  }
-
-  /**
    * Utility function to convert {Object} template to a tree of {Map}.
    * 
    * @param {Object} obj - JSON-like object
@@ -262,7 +264,7 @@ class DailyReport {
         // if is a leaf
         const element = new Element(key, obj[key]);
         mapTree.set(key, element);
-        leaves.set(DailyReport.keyFromCell(obj[key].cell), element); 
+        leaves.set(element.keyCell, element); 
       } 
       // does not recurses on arrays; are passed over
       else if (isObject(obj[key])){
@@ -287,7 +289,7 @@ class DailyReport {
 
     const leafKeys = Element.getSupportedTypes();
     // {Map} tree - having {Element} leaves
-    // {Map} elements - having key=DailyReport.keyFromCell([x,y]), and value is {Element} leaf 
+    // {Map} elements - having key=element.keyCell, and value is {Element} leaf 
     const [tree, elements] = DailyReport.objToMap(template, leafKeys);
     // populate headers (general info displayed on top of report sheet)
     tree.get('companyName').get('target_element').value = company.get('name');
@@ -295,115 +297,6 @@ class DailyReport {
     tree.get('reg_num').get('target_element').value = company.get('reg_num');
     
 
-/*
-    const uiRecord = tree.get('record');
-
-    const dataUiMap = new Map();
-    dataUiMap.set('date', 'date');
-    dataUiMap.set('ref', 'ref');
-    dataUiMap.set('doc_type', 'doc_type');
-    dataUiMap.set('descr', 'descr');
-
-    let rowNum = uiRecord.get('date').get('target_element').cell[0] - 1;
-    for (const record of this.dayValues){
-      ++ rowNum;
-
-      for (const [dataKey, value] of record){
-
-        // resolve direct mapping
-        if (dataUiMap.has(dataKey)){
-          const uiKey = dataUiMap.get(dataKey);
-          const uiTarget = uiRecord.get(uiKey).get('target_element');
-          // modify according with some criteria
-          if (uiKey === 'date'){
-            uiTarget.value = new Date(record.get(dataKey)).toLocaleDateString('ro-RO');
-            const origVal = uiTarget.cell[0];
-            uiTarget.cell[0] = rowNum;
-            uiTarget.render(toSheet);
-            uiTarget.cell[0] = origVal;
-            continue;
-          }
-          const origVal = uiTarget.cell[0]
-          uiTarget.value = record.get(dataKey);
-          uiTarget.cell[0] = rowNum;
-          uiTarget.render(toSheet);
-          uiTarget.cell[0] = origVal;
-          continue;
-        }
-
-        // resolve dynamic mapping
-        if (dataKey === 'I_O_type'){
-          const uiTargetInput = uiRecord.get('input').get('target_element');
-          const uiTargetOutput = uiRecord.get('output').get('target_element');
-          
-          if (value === 1){
-            uiTargetInput.value = record.get('value');
-            const origVal = uiTargetInput.cell[0];
-            uiTargetInput.cell[0] = rowNum;
-            uiTargetInput.render(toSheet);
-            uiTargetInput.cell[0] = origVal;
-          } else {
-            uiTargetOutput.value = record.get('value');
-            const origVal = uiTargetOutput.cell[0];
-            uiTargetOutput.cell[0] = rowNum;
-            uiTargetOutput.render(toSheet);
-            uiTargetOutput.cell[0] = origVal;
-          }
-        }
-      }
-      
-      // move and scale elements that needs to and render them again
-      const modifiedElements = new Map(); 
-
-      const body = tree.get('body').get('frame_element');
-      const total = tree.get('total').get('label_element');
-      const day_balance = tree.get('day_balance').get('label_element');
-
-      modifiedElements.set('body', body);
-      modifiedElements.set('total', total);
-      modifiedElements.set('day_balance', day_balance);
-
-      const numRecords = this.dayValues.length;
-
-      // render modified elements are restore their default values
-      for (const [parent, element] of modifiedElements){
-        if (parent === 'body'){
-          const originalVal = element.extent[0];
-          element.extent[0] = originalVal + numRecords;
-          element.render(toSheet);
-          element.extent[0] = originalVal;
-          continue;
-        }
-        if (parent === 'total'){
-          const originalVal = element.cell[0];
-          element.cell[0] = originalVal + numRecords;
-          element.render(toSheet);
-          element.cell[0] = originalVal;
-          continue;
-        }
-        if (parent === 'day_balance'){
-          const originalVal = element.cell[0];
-          element.cell[0] = originalVal + numRecords;
-          element.render(toSheet);
-          element.cell[0] = originalVal;
-          continue;
-        }
-
-      }
-      
-
-      // insert an empty row before modifiedElements
-    }
-*/
-
-/*
-    const defaultRecordElements = [
-      tree.get('record').get('date').get('target_element'),
-      tree.get('record').get('ref').get('target_element'),
-      tree.get('record').get('doc_type').get('target_element'),
-      tree.get('record').get('descr').get('target_element')
-    ];
-*/
     ((group=tree.get('previous_balance')) => {
       const label = group.get('label_element');
       const target = group.get('target_element');
@@ -420,7 +313,6 @@ class DailyReport {
     // number of sheet row - retrieved from an record element ('date');
     let rowNum = tree.get('record').get('date').get('target_element').cell[0] - 1;
     const numRecords = this.dayValues.length;
-    const frame = tree.get('body').get('frame_element');
     let i = 0;
     // {Map} record
     for (const record of this.dayValues){
@@ -441,45 +333,50 @@ class DailyReport {
         //updating cell position
         defaultElement.cell[0] += 1;
         // push new element (replacing existing key)
-        //elements.set(DailyReport.keyFromCell(newRecElem.cell), newRecElem);
-        elements.set(`${i+1}`, newRecElem);
+        elements.set(newRecElem.keyCell+i+1, newRecElem);
         // push updated key
-        //elements.set(DailyReport.keyFromCell(defaultElement.cell), defaultElement);
-        elements.set(`${i+2}`, defaultElement);
+        elements.set(defaultElement.keyCell+i+2, defaultElement);
       }
 
-      // expand body frame accordingly
-      //frame.extent[0] += 1;
     }
+
+    // expand body frame accordingly
+    ((group=tree.get('body')) => {
+      const frame = group.get('frame_element');
+      frame.extent[0] += numRecords;
+    })();
 
     ((group=tree.get('total')) => {
       const label = group.get('label_element');
       // replace '{}' with date in corresponding labels
       label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
       label.cell[0] += numRecords;
+      // update location key in elements
+      //elements.set(label.keyCell, label);
       const target = group.get('target_element');
       target.cell[0] += numRecords;
+      //elements.set(target.keyCell, target);
     })();
 
     ((group=tree.get('day_balance')) => {
       const label = group.get('label_element');
       label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
       label.cell[0] += numRecords;
+      //elements.set(label.keyCell, label);
       const target = group.get('target_element');
       target.cell[0] += numRecords;
+      //elements.set(target.keyCell, target);
     })();
 
-    frame.extent[0] += numRecords;
 
-    const renderedElements = new Map(); 
     // render all elements that has a value 
     for (const [key, element] of elements){
+      log('element.cell:', element.cell, 'elements key:', key, 'element.value:', element.value);
       const rendered = element.render(toSheet);
-      log('rendered:', key, element.value);
-      renderedElements.set(DailyReport.keyFromCell(rendered.cell), rendered);
+      //log('rendered:', key, element.value);
       }
 
-    return renderedElements;
+    return elements;
   }
 
 
