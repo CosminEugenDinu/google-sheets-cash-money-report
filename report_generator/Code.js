@@ -149,7 +149,6 @@ class Element {
 
   /**
    * Converts tuple array like [1, 2] into {string} key '1:2'
-   * @param {{x: Number, y: Number}[]}
    */
   get keyCell(){
     const [x, y] = this.cell;
@@ -316,17 +315,24 @@ class DailyReport {
         const newRecElem = new Element('target_element', defaultElement.templateElement);
         // make a copy (a new record element)
         // writing corresponding values from data record (dayValues)
-        if (parentKey === 'date') newRecElem.value = record.get('date');
-        if (parentKey === 'ref') newRecElem.value = record.get('ref');
-        if (parentKey === 'doc_type') newRecElem.value = record.get('doc_type');
-        if (parentKey === 'descr') newRecElem.value = record.get('descr'); 
+        if (parentKey === 'date') 
+          newRecElem.value = new Date(record.get('date')).toLocaleDateString('ro-RO');
+        if (parentKey === 'ref')
+          newRecElem.value = record.get('ref');
+        if (parentKey === 'doc_type')
+          newRecElem.value = record.get('doc_type');
+        if (parentKey === 'descr')
+          newRecElem.value = record.get('descr'); 
+        if (parentKey === 'input')
+          newRecElem.value = record.get('I_O_type') === 1 ? record.get('value') : '';
+        if (parentKey === 'output')
+          newRecElem.value = record.get('I_O_type') === 0 ? record.get('value') : '';
         //updating cell position
         newRecElem.cell[0] = defaultElement.cell[0];
         //updating cell position
         defaultElement.cell[0] += 1;
         // push new element (replacing existing key)
         elements.set(newRecElem.keyCell, newRecElem);
-        //elements.set(`${i+1}`, newRecElem);
         // push updated key
         elements.set(defaultElement.keyCell, defaultElement);
       }
@@ -362,12 +368,13 @@ class DailyReport {
 
 
     // render all elements that has a value 
+    const renderedElements = new Map();
     for (const [key, element] of elements){
       const rendered = element.render(toSheet);
-      log('rendered:', key, element.value);
+      renderedElements.set(key, rendered);
       }
 
-    return elements;
+    return renderedElements;
   }
 
 
