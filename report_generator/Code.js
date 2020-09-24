@@ -58,8 +58,8 @@ const verbosity = interfaceSheet.getSheetValues(8,5,1,1)[0][0];
 const v = +verbosity;
 
 // data source sheet corresponds with chosen company alias from drop-down
-const srcRawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SUFFIX);
-const dataRange = srcRawDataSheet.getRange('A2:F');
+const rawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SUFFIX);
+const dataRange = rawDataSheet.getRange('A2:F');
 
 
 const company = companies.get(companyAlias);
@@ -105,7 +105,6 @@ procedure === 'importData' && importData(
 
 //---------------------------------------------------------------------------------
 //
-const rawDataSheet = 'mock';
 
 if (procedure === 'cleanRawData'){
   const procedureDone = libraryGet(procedure)(
@@ -118,6 +117,8 @@ if (procedure === 'cleanRawData'){
 
 //---------------------------------------------------------------------------------
 
+const valid = libraryGet('validateRecord');
+valid([1,2,3]);
 
 // -------------------------- library --------------------------------
 
@@ -872,92 +873,9 @@ return companies;
 }
   
 function getRecords(range){
+  const validate = libraryGet('validateRecord');
   const rangeValues = range.getValues();
   const records = new Map();
-  const validators = [
-    date => {
-      if (isNaN(date.getTime()))
-        throw new TypeError(`Date ${typeof date} ${date} is not a valid {Date} instance.`);
-    },
-    ref => {
-      const type = typeof ref;
-      const val = ref;
-      if (type !== 'string')
-        throw new TypeError(`${type}, val:${val} is not string`); 
-    },
-    doc_type => {
-      const type = typeof doc_type;
-      const val = doc_type;
-      if (type !== 'string')
-        throw new TypeError(`${type}, val:${val} is not string`); 
-    },
-    descr => {
-      const type = typeof descr;
-      const val = descr;
-      if (type !== 'string')
-        throw new TypeError(`${type}, val:${val} is not string`); 
-    },
-    I_O_type => {
-      const type = typeof I_O_type;
-      const val = I_O_type;
-      if (type !== 'number')
-        throw new TypeError(`${type}, val:${val} is not number`);
-      if (val < 0 || val > 1)
-        throw new TypeError(`${type}, val:${val} is not 1 or 0`); 
-    },
-    value => {
-      const type = typeof value;
-      const val = value;
-      if (type !== 'number')
-        throw new TypeError(`${type}, val:${val} is not number`);
-    }
-  ];
-
-  const clean = (row, row_i) => {
-    for (let i=0; i<row.length; i++){
-
-      const col_i = i + 1;
-      const origVal = row[i];
-
-      try {
-        validators[i](row[i]);
-      } catch (e) {
-        // if ref is not string
-        if (e.message.match(/.*\sis\snot\sstring/)){
-          const newVal = `${row[i]}`;
-          const cell = range.getCell(row_i+1,col_i);
-          cell.setValue(newVal);
-          cell.setFontColor('red');
-          // throw new Error(`Changed from ${origVal} to ${cell.getValue()}, row_i:${row_i}, col_i:${col_i}`);
-          v>0&& log(`Changed from ${origVal} to ${cell.getValue()}, row_i:${row_i}, col_i:${col_i}`);
-        }
-        if (e.message.match(/.*\sis\snot\snumber/)){
-          const cell = range.getCell(row_i+1,col_i);
-          cell.setBackground('pink');
-          throw new Error(`Sheet_row:${row_i+2},col_i:${col_i},val:${e.message}`);
-        }
-      }
-    }
-  };
-
-
-  // validate record (row)
-  const validate = row => {
-    for (let i=0; i<row.length; i++)
-      validators[i](row[i]);
-  };
-
-
-  const cleanRecords = () => {
-    for (let i=1; i<rangeValues.length; i++){
-      const row = rangeValues[i];
-      clean(row, i);
-    }
-    v>0&& log('All records are cleaned.');
-  };
-  
-  // uncomment next line in order to transform some values and throw useful info if validate fails
-  // cleanRecords();
 
 
   for (const row of rangeValues){
@@ -1208,12 +1126,107 @@ if (required==='cleanRawData') return function cleanRawData(
     fromDate,
     toDate,
     company,
-    rawDataSheet
+    rawDataSheet 
 )
 {
-log('hello from cleanRawData');
+v>0&& log('Procedure cleanRawData begin');
+const dataRange = rawDataSheet.getRange('A2:F');
+const vali = libraryGet('validateRecord');
+vali('validateRecord from cleanRawData')
 
+v>0&& log('Procedure cleanRawData END');
 } // procedure cleanRawData END
+
+if (required==='validateRecord') return function validateRecord(record)
+{
+  log(record);
+/*
+  const validators = [
+    date => {
+      if (isNaN(date.getTime()))
+        throw new TypeError(`Date ${typeof date} ${date} is not a valid {Date} instance.`);
+    },
+    ref => {
+      const type = typeof ref;
+      const val = ref;
+      if (type !== 'string')
+        throw new TypeError(`${type}, val:${val} is not string`); 
+    },
+    doc_type => {
+      const type = typeof doc_type;
+      const val = doc_type;
+      if (type !== 'string')
+        throw new TypeError(`${type}, val:${val} is not string`); 
+    },
+    descr => {
+      const type = typeof descr;
+      const val = descr;
+      if (type !== 'string')
+        throw new TypeError(`${type}, val:${val} is not string`); 
+    },
+    I_O_type => {
+      const type = typeof I_O_type;
+      const val = I_O_type;
+      if (type !== 'number')
+        throw new TypeError(`${type}, val:${val} is not number`);
+      if (val < 0 || val > 1)
+        throw new TypeError(`${type}, val:${val} is not 1 or 0`); 
+    },
+    value => {
+      const type = typeof value;
+      const val = value;
+      if (type !== 'number')
+        throw new TypeError(`${type}, val:${val} is not number`);
+    }
+  ];
+
+  const clean = (row, row_i) => {
+    for (let i=0; i<row.length; i++){
+
+      const col_i = i + 1;
+      const origVal = row[i];
+
+      try {
+        validators[i](row[i]);
+      } catch (e) {
+        // if ref is not string
+        if (e.message.match(/.*\sis\snot\sstring/)){
+          const newVal = `${row[i]}`;
+          const cell = range.getCell(row_i+1,col_i);
+          cell.setValue(newVal);
+          cell.setFontColor('red');
+          // throw new Error(`Changed from ${origVal} to ${cell.getValue()}, row_i:${row_i}, col_i:${col_i}`);
+          v>0&& log(`Changed from ${origVal} to ${cell.getValue()}, row_i:${row_i}, col_i:${col_i}`);
+        }
+        if (e.message.match(/.*\sis\snot\snumber/)){
+          const cell = range.getCell(row_i+1,col_i);
+          cell.setBackground('pink');
+          throw new Error(`Sheet_row:${row_i+2},col_i:${col_i},val:${e.message}`);
+        }
+      }
+    }
+  };
+
+
+  // validate record (row)
+  const validate = row => {
+    for (let i=0; i<row.length; i++)
+      validators[i](row[i]);
+  };
+
+
+  const cleanRecords = () => {
+    for (let i=1; i<rangeValues.length; i++){
+      const row = rangeValues[i];
+      clean(row, i);
+    }
+    v>0&& log('All records are cleaned.');
+  };
+  
+  // uncomment next line in order to transform some values and throw useful info if validate fails
+  // cleanRecords();
+*/
+} // function validateRecord END
 
 } // function libraryGet END
 
