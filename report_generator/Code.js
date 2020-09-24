@@ -68,7 +68,8 @@ const template = TEMPLATE;
 const targetSpreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
 
 
-//-----------------------------------------------------------------
+//---------------------------------------------------------------------------------
+
 procedure === 'renderReport' && renderReport(
   fromDate,
   toDate,
@@ -77,7 +78,7 @@ procedure === 'renderReport' && renderReport(
   template,
   targetSpreadsheet);
 
-//-----------------------------------------------------------------
+//---------------------------------------------------------------------------------
 
 //const dataLinks = settingsSheet.getSheetValues(1,16,1000,3);
 // spreadsheet links iterable
@@ -100,8 +101,17 @@ procedure === 'importData' && importData(
   identifierPattern,
   sheetToImportTo
 );
-//-----------------------------------------------------------------
 
+//---------------------------------------------------------------------------------
+
+procedure === 'cleanRawData' && cleanRawData(
+  fromDate,
+  toDate,
+  company,
+  rawDataSheet
+);
+
+//---------------------------------------------------------------------------------
 
 
 // -------------------------- library --------------------------------
@@ -554,13 +564,6 @@ function importData(fromDate, toDate, company, dataLinks, identifierPattern, she
 
   // tableName the prefix before '.' in field name, like tableName.fieldName
   const linkTableName = 'link';
-/*
-  const linkFieldNames = dataLinks[0].map(
-    fullName => fullName.replace(new RegExp(`^${linkTableName}\.`), '')
-    );
-  // index of field with name = company alias
-  const companyIndex = linkFieldNames.indexOf(company.get('alias'));
-*/
 
   // list of google sheets ids 
   const sheetIds = (dataLinks => {
