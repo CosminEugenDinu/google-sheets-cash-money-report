@@ -64,7 +64,7 @@ const dataRange = rawDataSheet.getRange('A2:F');
 
 const company = companies.get(companyAlias);
 // cannot run without cleanRawData
-// const dataRecords = getRecords(dataRange);
+const dataRecords = getRecords(dataRange);
 const template = TEMPLATE;
 const targetSpreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
 
@@ -117,8 +117,6 @@ if (procedure === 'cleanRawData'){
 
 //---------------------------------------------------------------------------------
 
-const valid = libraryGet('validateRecord');
-valid([1,2,3]);
 
 // -------------------------- library --------------------------------
 
@@ -873,14 +871,14 @@ return companies;
 }
   
 function getRecords(range){
-  const validate = libraryGet('validateRecord');
+  //const validate = libraryGet('validateRecord');
   const rangeValues = range.getValues();
   const records = new Map();
 
 
   for (const row of rangeValues){
 
-    validate(row);
+   // validate(row);
 
     const record = new Map();
     const date = row[0].toJSON();
@@ -1050,8 +1048,8 @@ function defaultTemplate(){
 
 function libraryGet(required){
   
-if (required==='settings') return class Settings
-{
+if (required==='settings')
+  return class Settings{
   constructor(settingsSheet, rowLim, colLim){
     const range = settingsSheet.getRange(1,1,rowLim,colLim);
     const sheetValues = settingsSheet.getSheetValues(1,1,rowLim,colLim);
@@ -1122,63 +1120,29 @@ if (required==='settings') return class Settings
 } // class Settings END
 
 
-if (required==='cleanRawData') return function cleanRawData(
-    fromDate,
-    toDate,
-    company,
-    rawDataSheet 
-)
+if (required==='cleanRawData')
+  return function cleanRawData(fromDate, toDate, company, rawDataSheet)
 {
-v>0&& log('Procedure cleanRawData begin');
-const dataRange = rawDataSheet.getRange('A2:F');
-const vali = libraryGet('validateRecord');
-vali('validateRecord from cleanRawData')
+  v>0&& log('Procedure cleanRawData begin');
 
-v>0&& log('Procedure cleanRawData END');
-} // procedure cleanRawData END
+  const validate = libraryGet('validateRecord');
 
-if (required==='validateRecord') return function validateRecord(record)
-{
-  log(record);
-/*
-  const validators = [
-    date => {
-      if (isNaN(date.getTime()))
-        throw new TypeError(`Date ${typeof date} ${date} is not a valid {Date} instance.`);
+  const dataRange = rawDataSheet.getRange('A1:Z');
+  const values = dataRange.getValues();
+  v>1&& log(`Records in ${rawDataSheet.getName()}: ${values.length}`);
+
+  // object to store fieldName as key and associated index as value
+  // this object will be queried for every value and it seems JS is very fast at
+  // reading plain objects (key is string and value does not change)
+  // it seems it is better over a {Map} instance;
+  const fieldNames = values[0].reduce(
+    (indexes, fieldName, i) => {
+      // only fields that has a value are recorded
+      if (fieldName) indexes[fieldName] = i;
+      return indexes;
     },
-    ref => {
-      const type = typeof ref;
-      const val = ref;
-      if (type !== 'string')
-        throw new TypeError(`${type}, val:${val} is not string`); 
-    },
-    doc_type => {
-      const type = typeof doc_type;
-      const val = doc_type;
-      if (type !== 'string')
-        throw new TypeError(`${type}, val:${val} is not string`); 
-    },
-    descr => {
-      const type = typeof descr;
-      const val = descr;
-      if (type !== 'string')
-        throw new TypeError(`${type}, val:${val} is not string`); 
-    },
-    I_O_type => {
-      const type = typeof I_O_type;
-      const val = I_O_type;
-      if (type !== 'number')
-        throw new TypeError(`${type}, val:${val} is not number`);
-      if (val < 0 || val > 1)
-        throw new TypeError(`${type}, val:${val} is not 1 or 0`); 
-    },
-    value => {
-      const type = typeof value;
-      const val = value;
-      if (type !== 'number')
-        throw new TypeError(`${type}, val:${val} is not number`);
-    }
-  ];
+    Object.create(null));
+  v>2&& log(`Fields are: ${JSON.stringify(fieldNames)}`)
 
   const clean = (row, row_i) => {
     for (let i=0; i<row.length; i++){
@@ -1208,13 +1172,6 @@ if (required==='validateRecord') return function validateRecord(record)
   };
 
 
-  // validate record (row)
-  const validate = row => {
-    for (let i=0; i<row.length; i++)
-      validators[i](row[i]);
-  };
-
-
   const cleanRecords = () => {
     for (let i=1; i<rangeValues.length; i++){
       const row = rangeValues[i];
@@ -1222,10 +1179,85 @@ if (required==='validateRecord') return function validateRecord(record)
     }
     v>0&& log('All records are cleaned.');
   };
+
+  for (let i=1; i<values.length; i++){
+    // sheet row number
+    const rangeRowNum = i + 1;
+    const row = values[i];
+    try {
+      validate(row, fieldNames);
+    } catch(e) {
+      log(e);
+      throw new Error('ceva' + e.message);
+    }
+    if (i === 3) break;
+
+  }
+
+
+  v>0&& log('Procedure cleanRawData END');
+} // procedure cleanRawData END
+
+if (required==='validateRecord')
+  /**
+   * @param {Array} record
+   * @param {Object} fieldNames
+   */
+  return function validateRecord(record, fieldNames)
+{
+  const validators = new Map();
+  validators.set('date',
+    date => {
+      if (isNaN(date.getTime()))
+        throw new TypeError(`Date ${typeof date} ${date} is not a valid {Date} instance.`);
+    });
+  validators.set('ref',
+    ref => {
+      const type = typeof ref;
+      const val = ref;
+      if (type !== 'string')
+        throw new TypeError(`${type}, val:${val} is not string`); 
+    });
+  validators.set('doc_type',
+    doc_type => {
+      const type = typeof doc_type;
+      const val = doc_type;
+      if (type !== 'string')
+        throw new TypeError(`${type}, val:${val} is not string`); 
+    });
+  validators.set('descr',
+    descr => {
+      const type = typeof descr;
+      const val = descr;
+      if (type !== 'string')
+        throw new TypeError(`${type}, val:${val} is not string`); 
+    });
+  validators.set('I_O_type',
+    I_O_type => {
+      const type = typeof I_O_type;
+      const val = I_O_type;
+      if (type !== 'number')
+        throw new TypeError(`${type}, val:${val} is not number`);
+      if (val < 0 || val > 1)
+        throw new TypeError(`${type}, val:${val} is not 1 or 0`); 
+    });
+  validators.set('value',
+    value => {
+      const type = typeof value;
+      const val = value;
+      if (type !== 'number')
+        throw new TypeError(`${type}, val:${val} is not number`);
+    });
+
+  // validate record (row)
+  for (const fieldName in fieldNames){
+    const i = fieldNames[fieldName];
+    if ( ! validators.has(fieldName))
+      throw new ReferenceError(`Validator function not set for field ${fieldName}`);
+    validators.get(fieldName)(record[i]);
+  }
+
   
-  // uncomment next line in order to transform some values and throw useful info if validate fails
-  // cleanRecords();
-*/
 } // function validateRecord END
 
 } // function libraryGet END
