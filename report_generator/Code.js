@@ -5,9 +5,10 @@
  */
 function makeReport() {
 
+const Settings = libraryGet('settings');
+
 // global settings variables
 const REPORT_GENERATOR_SPREADSHEET_ID = "1nDNPcpgP9TlAcTSKASwFxuQQswdAI7Wm3I8Z-7rSGnE";
-const REPORT_SPREADSHEET_ID = "1e0nIxg2pNLnnSPmKdmkRHS7cl7kVEj2G9CKBksXflEk";
 const INTERFACE_SHEET_NAME = "Interface";
 const SETTINGS_SHEET_NAME = "settings";
 const RAWDATA_SHEET_SUFFIX = "_rawdata";
@@ -18,32 +19,41 @@ const TEMPLATE = defaultTemplate();
 const log = Log(REPORT_GENERATOR_SPREADSHEET_ID, 0, [10,5]);
   
 const repGenSprSheet = SpreadsheetApp.openById(REPORT_GENERATOR_SPREADSHEET_ID);
-const repSprSheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
 
-// interface is a {Sheet} with selects and button that triggers 'makeReport'
-const interface = repGenSprSheet.getSheetByName(INTERFACE_SHEET_NAME);
-const settings = repGenSprSheet.getSheetByName(SETTINGS_SHEET_NAME);
- 
-const companies = getCompanies(settings);
+// interfaceSheet is a {Sheet} with selects and button that triggers 'makeReport'
+const interfaceSheet = repGenSprSheet.getSheetByName(INTERFACE_SHEET_NAME);
+const settingsSheet = repGenSprSheet.getSheetByName(SETTINGS_SHEET_NAME);
+
+const settings = new Settings(settingsSheet, 50, 1000);
+
+const varIndex = settings
+    .getField('procedure.variable.name')
+    .getByValue('renderReport.reportspreadsheetid');
+const REPORT_SPREADSHEET_ID = settings
+    .getField('procedure.variable.value')
+    .getByIndex(varIndex);
+
+
+const companies = getCompanies(settingsSheet);
 const companyAliases = Array.from(companies.keys());
 const computedRawDataSheetNames = companyAliases.map(
   alias => alias + RAWDATA_SHEET_SUFFIX); 
 const rawDataSheets = repGenSprSheet.getSheets().filter(
   sheet => {
   const sheetName = sheet.getSheetName();
-  // get all sheets except Interface and settings
+  // get all sheets except Interface and settingsSheet
   return (sheetName !== INTERFACE_SHEET_NAME) && (sheetName !== SETTINGS_SHEET_NAME);
 });
   
-// if company alias name was changed in settings
+// if company alias name was changed in settingsSheet
 updateRawDataSheetNames(rawDataSheets, computedRawDataSheetNames);
 
-// user selects in interface
-const procedure = interface.getSheetValues(8,1,1,1)[0][0];
-const companyAlias = interface.getSheetValues(8,2,1,1)[0][0];
-const [fromDate, toDate] = interface.getSheetValues(8,3,1,2)[0];
+// user selects in interfaceSheet
+const procedure = interfaceSheet.getSheetValues(8,1,1,1)[0][0];
+const companyAlias = interfaceSheet.getSheetValues(8,2,1,1)[0][0];
+const [fromDate, toDate] = interfaceSheet.getSheetValues(8,3,1,2)[0];
 
-const verbosity = interface.getSheetValues(8,5,1,1)[0][0];
+const verbosity = interfaceSheet.getSheetValues(8,5,1,1)[0][0];
 // v=0 - critical, v=1 - informal, v=2 - too verbose
 const v = +verbosity;
 
@@ -55,7 +65,8 @@ const dataRange = srcRawDataSheet.getRange('A2:F');
 const company = companies.get(companyAlias);
 const dataRecords = getRecords(dataRange);
 const template = TEMPLATE;
-const targetSpreadsheet = repSprSheet;
+const targetSpreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
+
 
 //-----------------------------------------------------------------
 procedure === 'renderReport' && renderReport(
@@ -68,15 +79,25 @@ procedure === 'renderReport' && renderReport(
 
 //-----------------------------------------------------------------
 
-const dataLinks = settings.getSheetValues(1,16,1000,3);
+//const dataLinks = settingsSheet.getSheetValues(1,16,1000,3);
+// spreadsheet links iterable
+const dataLinks = settings.getField(`link.${companyAlias}`).getValues();
+
+// this pattern is uset to search records in source spreadsheets (dataLinks);
+const identifierPattern = settings.getField('procedure.variable.value').getByIndex(
+  settings.getField('procedure.variable.name')
+  .getByValue('importData.identifierPattern')
+  );
 const [sheetToImportTo] = rawDataSheets.filter(
   sheet => sheet.getName() === company.get('alias')+RAWDATA_SHEET_SUFFIX
   )
+
 procedure === 'importData' && importData(
   fromDate,
   toDate,
   company,
   dataLinks,
+  identifierPattern,
   sheetToImportTo
 );
 //-----------------------------------------------------------------
@@ -236,6 +257,14 @@ class DailyReport {
     })();
 
     this.previous_balance = calculateBalance(this.prevDateStr);
+    
+    // if balance is negative, that means you spent cash money you didn't collect
+    if (this.previous_balance < 0){
+      const localPrevDate = new Date(this.prevDateStr).toLocaleDateString('ro-RO');
+      throw new Error(
+        `Previous day (${localPrevDate}) balance cannot be negative (${this.previous_balance}).`
+      ); 
+    }
 
     const [total_input, total_day_output] = this.dayValues.reduce(
       (in_out, record) => {
@@ -516,44 +545,38 @@ v>0&& log('Procedure renderReport END');
  * and populate corresponding rawDataSheet.
  *
  * @param {Map} company - dict with company info keys like 'name', 'alias', etc
- * @param {Array[][]} dataLinks - records with links (urls) of google sheets
- *      - dataLinks[0]: list of fields names, like [link.company1, link.company2, ...]
- *      - dataLinks[1...n]: records of links, like ['link1', 'link2', ...] 
- *      - dataLinks[row][column]: {string} like 'https://docs.google.com/spreadsheets/d/<< sheetId >>/edit#gid=xxxxxxxxxx';
+ * @param {Iterable} dataLinks - records with links (urls) of google sheets
+ *      - {string} like 'https://docs.google.com/spreadsheets/d/<< sheetId >>/edit#gid=xxxxxxxxxx';
  */
-function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
+function importData(fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo){
   v>0&& log('Procedure importData begin');
-  v>2&& log(`Company alias: ${company.get('alias')}.`);
+  v>2&& log(`Company alias: ${company.get('alias')}`);
 
   // tableName the prefix before '.' in field name, like tableName.fieldName
   const linkTableName = 'link';
+/*
   const linkFieldNames = dataLinks[0].map(
     fullName => fullName.replace(new RegExp(`^${linkTableName}\.`), '')
     );
   // index of field with name = company alias
   const companyIndex = linkFieldNames.indexOf(company.get('alias'));
+*/
 
   // list of google sheets ids 
   const sheetIds = (dataLinks => {
-    const links = [];
-    // count the number successive empty rows  
-    let numOfEmpty = 0; 
-    let i = 1;
-    while (numOfEmpty < 10){
-      const link = dataLinks[i++][companyIndex];
-      if (link){
+    const ids = [];
+    for (const link of dataLinks){
+      if (link)
         try {
           const sheetId = extractId(link);
-          links.push(sheetId);
+          ids.push(sheetId);
           numOfEmpty = 0;
         } catch(e){
           v>0&& log(`${e}\nSeems that link:\n${link}\ndoes not match pattern.`);
         }
-      } else {
-        ++ numOfEmpty;
-      }
+      else throw new ReferenceError('No spreadsheet link.');
     }
-    return links;
+    return ids;
   })(dataLinks)
 
   // list of source Spreadsheets opened by ids;
@@ -579,7 +602,7 @@ function importData(fromDate, toDate, company, dataLinks, sheetToImportTo){
 
   const foundRecords = new Map(); 
   for (const sheet of srcSpreadsheets){
-    for (const [dateStr, record] of searchRecords(sheet)){
+    for (const [dateStr, record] of searchRecords(sheet, identifierPattern)){
       foundRecords.set(dateStr, record);
     }
   }
@@ -690,14 +713,15 @@ function areTheSame(map_1, map_2){
  *      - {string} keys - dates (ISO 8601)
  *      - {Array} values - of {Map} records, like {'date'=>{Date}, 'ref'=>32, etc.} 
  */
-function searchRecords(spreadsheet, rowLim=50, colLim=6){
+function searchRecords(spreadsheet, identifierPattern, rowLim=50, colLim=6){
   const records = new Map();
 
   // measurements
   const messages = new Map();
 
   // pattern to search against 
-  const identifierRe = /=RIGHT\(CELL\("filename",A\d\),LEN\(CELL\("filename",A\d\)\)-FIND\("\]",CELL\("filename",A\d\)\)\)/;
+  //const identifierRe = /=RIGHT\(CELL\("filename",A\d\),LEN\(CELL\("filename",A\d\)\)-FIND\("\]",CELL\("filename",A\d\)\)\)/;
+  const identifierRe = new RegExp(identifierPattern);
 
   for (const sheet of spreadsheet.getSheets()){
     
@@ -925,7 +949,7 @@ function getRecords(range){
   };
   
   // uncomment next line in order to transform some values and throw useful info if validate fails
-  cleanRecords();
+  // cleanRecords();
 
 
   for (const row of rangeValues){
@@ -1096,6 +1120,82 @@ function defaultTemplate(){
     },
   };
   return TEMPLATE;
+}
+
+function libraryGet(required){
+  
+if (required==='settings') return class Settings
+{
+  constructor(settingsSheet, rowLim, colLim){
+    const range = settingsSheet.getRange(1,1,rowLim,colLim);
+    const sheetValues = settingsSheet.getSheetValues(1,1,rowLim,colLim);
+
+    // key {string} fieldName, value {Number} index of column
+    const fieldNames = new Map();
+    sheetValues[0].forEach(
+      (fieldName, index) => {
+        if (!!fieldName) fieldNames.set(fieldName, index); 
+      }
+    );
+    
+    const fields = new Map();
+    for (const [fieldName, index] of fieldNames){
+      const values = new Map();
+      const indexes = new Map();
+
+      for (let i=1; i<sheetValues.length; i++){
+        const row = sheetValues[i];
+        const fieldValue = row[index];
+        if ( ! fieldValue) continue;
+        values.set(i, fieldValue);
+        indexes.set(fieldValue, i);
+      }
+      
+      const fieldObject = {
+        getByIndex(index){
+          if ( ! values.has(index))
+            throw new ReferenceError(`Field ${fieldName} does not have key-index ${index}`);
+          return values.get(index);
+        },
+        getByValue(val){
+          if ( ! indexes.has(val))
+            throw new ReferenceError(`Field ${fieldName} does not have key-value ${val}`);
+          return indexes.get(val);
+        },
+        getValues(){
+          return values.values();
+        }
+      }
+
+      //fields.set(fieldName, values);
+      fields.set(fieldName, fieldObject);
+    }
+
+    this._sheetValues = sheetValues;
+    this._range = range;
+    this._fieldNames = fieldNames;
+    this._fields = fields;
+
+  }
+
+
+  get fieldNames(){
+    return Array.from(this._fieldNames.keys());
+  }
+  set fieldNames(val){
+    throw new Error(`Settings.fieldNames is read only. Cannot set ${val}.`)
+  }
+
+  getField(fieldName){
+    if ( ! this._fieldNames.has(fieldName))
+      throw new ReferenceError(`${fieldName} is not a field name`);
+    return this._fields.get(fieldName);
+  }
+  
+  
+} // class Settings END
+
+
 }
 
 } // makeReport END
