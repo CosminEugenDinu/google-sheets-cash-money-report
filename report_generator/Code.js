@@ -872,43 +872,6 @@ function getCompanies(sheet, records=10, fields=4){
  }
 return companies;
 }
-/*  
-function getRecords(rawDataSheet){
-  const validate = libraryGet('validateRecord');
-  const getFieldNames = libraryGet('getFieldNames');
-
-  const inspectRange = rawDataSheet.getRange('A1:Z');
-  const rangeValues = inspectRange.getValues();
-  const rowCount = rangeValues.length;
-  v>1&& log(`Records in ${rawDataSheet.getName()}: ${rowCount}`);
-
-  const records = new Map();
-
-  for (let i=1; i<rangeValues.length; i++){
-    const row = rangeValues[i];
-    try {
-      validate(row, getFieldNames(rangeValues[0]));
-    } catch(e){
-      throw new TypeError(
-        `In getRecords(${rawDataSheet.getName()}), row:${i+1}, got: ${e.message}`
-        ); 
-    }
-    const record = new Map();
-    const date = row[0].toJSON();
-    record.set('date', date);
-    record.set('ref', row[1]);
-    record.set('doc_type', row[2]);
-    record.set('descr', row[3]);
-    record.set('I_O_type', row[4]);
-    record.set('value', row[5]);
-    // a record will be retrieved by date
-    records.get(date) && records.get(date).push(record)
-      || records.set(date, [record]);
-  }
-
-  return records;
-}
-*/
 
 function updateRawDataSheetNames(rawDataSheets, computedNames){
       rawDataSheets.map(
