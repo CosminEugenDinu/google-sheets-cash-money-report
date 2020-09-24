@@ -63,7 +63,8 @@ const dataRange = srcRawDataSheet.getRange('A2:F');
 
 
 const company = companies.get(companyAlias);
-const dataRecords = getRecords(dataRange);
+// cannot run without cleanRawData
+// const dataRecords = getRecords(dataRange);
 const template = TEMPLATE;
 const targetSpreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
 
@@ -103,13 +104,17 @@ procedure === 'importData' && importData(
 );
 
 //---------------------------------------------------------------------------------
+//
+const rawDataSheet = 'mock';
 
-procedure === 'cleanRawData' && cleanRawData(
-  fromDate,
-  toDate,
-  company,
-  rawDataSheet
-);
+if (procedure === 'cleanRawData'){
+  const procedureDone = libraryGet(procedure)(
+    fromDate,
+    toDate,
+    company,
+    rawDataSheet
+  );
+}
 
 //---------------------------------------------------------------------------------
 
@@ -1199,7 +1204,18 @@ if (required==='settings') return class Settings
 } // class Settings END
 
 
-}
+if (required==='cleanRawData') return function cleanRawData(
+    fromDate,
+    toDate,
+    company,
+    rawDataSheet
+)
+{
+log('hello from cleanRawData');
+
+} // procedure cleanRawData END
+
+} // function libraryGet END
 
 } // makeReport END
 
