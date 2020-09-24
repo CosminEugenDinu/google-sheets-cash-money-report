@@ -65,6 +65,7 @@ const rawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SU
 const company = companies.get(companyAlias);
 // cannot run without cleanRawData
 //const dataRecords = getRecords(dataRange);
+const getRecords = libraryGet('getRecords');
 const dataRecords = getRecords(rawDataSheet);
 const template = TEMPLATE;
 const targetSpreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
@@ -566,6 +567,7 @@ v>0&& log('Procedure renderReport END');
 function importData(fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo){
   v>0&& log('Procedure importData begin');
   v>2&& log(`Company alias: ${company.get('alias')}`);
+  const getRecords = libraryGet('getRecords');
 
   // tableName the prefix before '.' in field name, like tableName.fieldName
   const linkTableName = 'link';
@@ -622,7 +624,6 @@ function importData(fromDate, toDate, company, dataLinks, identifierPattern, she
 
   
   // retrieve existing records in raw data sheet
-  //const existingRecords = getRecords(sheetToImportTo.getRange('A2:F'));
   const existingRecords = getRecords(sheetToImportTo);
   v>2&& log(`${existingRecords.size} day-records exists in ${sheetToImportTo.getName()}`);
 
@@ -871,7 +872,7 @@ function getCompanies(sheet, records=10, fields=4){
  }
 return companies;
 }
-  
+/*  
 function getRecords(rawDataSheet){
   const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
@@ -907,6 +908,7 @@ function getRecords(rawDataSheet){
 
   return records;
 }
+*/
 
 function updateRawDataSheetNames(rawDataSheets, computedNames){
       rawDataSheets.map(
@@ -1281,6 +1283,44 @@ if (required==='getFieldNames')
 
   return fieldNames;
 }
+
+if (required==='getRecords')
+  return function getRecords(rawDataSheet)
+{
+  const validate = libraryGet('validateRecord');
+  const getFieldNames = libraryGet('getFieldNames');
+
+  const inspectRange = rawDataSheet.getRange('A1:Z');
+  const rangeValues = inspectRange.getValues();
+  const rowCount = rangeValues.length;
+  v>1&& log(`Records in ${rawDataSheet.getName()}: ${rowCount}`);
+
+  const records = new Map();
+
+  for (let i=1; i<rangeValues.length; i++){
+    const row = rangeValues[i];
+    try {
+      validate(row, getFieldNames(rangeValues[0]));
+    } catch(e){
+      throw new TypeError(
+        `In getRecords(${rawDataSheet.getName()}), row:${i+1}, got: ${e.message}`
+        ); 
+    }
+    const record = new Map();
+    const date = row[0].toJSON();
+    record.set('date', date);
+    record.set('ref', row[1]);
+    record.set('doc_type', row[2]);
+    record.set('descr', row[3]);
+    record.set('I_O_type', row[4]);
+    record.set('value', row[5]);
+    // a record will be retrieved by date
+    records.get(date) && records.get(date).push(record)
+      || records.set(date, [record]);
+  }
+
+  return records;
+} // function getRecords END
 
 
 } // function libraryGet END
