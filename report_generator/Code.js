@@ -848,51 +848,66 @@ function getRecords(range){
         throw new TypeError(`Date ${typeof date} ${date} is not a valid {Date} instance.`);
     },
     ref => {
-      if (typeof ref !== 'string')
-        throw new TypeError(`Ref ${typeof ref} ${ref} is not string`); 
+      const type = typeof ref;
+      const val = ref;
+      if (type !== 'string')
+        throw new TypeError(`${type}, val:${val} is not string`); 
     },
     doc_type => {
-      if (typeof doc_type !== 'string')
-        throw new TypeError(`Doc_type ${typeof doc_type} ${doc_type} is not string`);
+      const type = typeof doc_type;
+      const val = doc_type;
+      if (type !== 'string')
+        throw new TypeError(`${type}, val:${val} is not string`); 
     },
     descr => {
-      if (typeof descr !== 'string')
-        throw new TypeError(`Descr ${typeof descr} ${descr} is not string`);
+      const type = typeof descr;
+      const val = descr;
+      if (type !== 'string')
+        throw new TypeError(`${type}, val:${val} is not string`); 
     },
     I_O_type => {
-      if (I_O_type < 0 || I_O_type > 1)
-        throw new TypeError(`I_O_type ${I_O_type} is not 1 or 0`); 
+      const type = typeof I_O_type;
+      const val = I_O_type;
+      if (type !== 'number')
+        throw new TypeError(`${type}, val:${val} is not number`);
+      if (val < 0 || val > 1)
+        throw new TypeError(`${type}, val:${val} is not 1 or 0`); 
     },
     value => {
-      if (typeof value !== 'number')
-        throw new TypeError(`Value ${typeof value} ${value} is number`);
+      const type = typeof value;
+      const val = value;
+      if (type !== 'number')
+        throw new TypeError(`${type}, val:${val} is not number`);
     }
   ];
 
   const clean = (row, row_i) => {
     for (let i=0; i<row.length; i++){
+
+      const col_i = i + 1;
+      const origVal = row[i];
+
       try {
         validators[i](row[i]);
       } catch (e) {
         // if ref is not string
-        if (e.message.match(/Ref\s.*\sis\snot\sstring/)){
-          const origVal = row[i];
+        if (e.message.match(/.*\sis\snot\sstring/)){
           const newVal = `${row[i]}`;
-          const col_i = i + 1;
           const cell = range.getCell(row_i+1,col_i);
           cell.setValue(newVal);
           cell.setFontColor('red');
           // throw new Error(`Changed from ${origVal} to ${cell.getValue()}, row_i:${row_i}, col_i:${col_i}`);
           v>0&& log(`Changed from ${origVal} to ${cell.getValue()}, row_i:${row_i}, col_i:${col_i}`);
         }
+        if (e.message.match(/.*\sis\snot\snumber/)){
+          const cell = range.getCell(row_i+1,col_i);
+          cell.setBackground('pink');
+          throw new Error(`Sheet_row:${row_i+2},col_i:${col_i},val:${e.message}`);
+        }
       }
     }
   };
 
-  for (let i=1; i<rangeValues.length; i++){
-    const row = rangeValues[i];
-    clean(row, i);
-  }
 
   // validate record (row)
   const validate = row => {
@@ -901,24 +916,33 @@ function getRecords(range){
   };
 
 
+  const cleanRecords = () => {
+    for (let i=1; i<rangeValues.length; i++){
+      const row = rangeValues[i];
+      clean(row, i);
+    }
+    v>0&& log('All records are cleaned.');
+  };
+  
+  // uncomment next line in order to transform some values and throw useful info if validate fails
+  cleanRecords();
 
 
   for (const row of rangeValues){
 
     validate(row);
+
     const record = new Map();
-    //if (row.filter(v=>v!="").length){
-      const date = row[0].toJSON();
-      record.set('date', date);
-      record.set('ref', row[1]);
-      record.set('doc_type', row[2]);
-      record.set('descr', row[3]);
-      record.set('I_O_type', row[4]);
-      record.set('value', row[5]);
-      // a record will be retrieved by date
-      records.get(date) && records.get(date).push(record)
-        || records.set(date, [record]);
-    //} 
+    const date = row[0].toJSON();
+    record.set('date', date);
+    record.set('ref', row[1]);
+    record.set('doc_type', row[2]);
+    record.set('descr', row[3]);
+    record.set('I_O_type', row[4]);
+    record.set('value', row[5]);
+    // a record will be retrieved by date
+    records.get(date) && records.get(date).push(record)
+      || records.set(date, [record]);
   }
   return records;
 }
