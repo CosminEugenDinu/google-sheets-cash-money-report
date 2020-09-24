@@ -59,12 +59,13 @@ const v = +verbosity;
 
 // data source sheet corresponds with chosen company alias from drop-down
 const rawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SUFFIX);
-const dataRange = rawDataSheet.getRange('A2:F');
+//const dataRange = rawDataSheet.getRange('A2:F');
 
 
 const company = companies.get(companyAlias);
 // cannot run without cleanRawData
-const dataRecords = getRecords(dataRange);
+//const dataRecords = getRecords(dataRange);
+const dataRecords = getRecords(rawDataSheet);
 const template = TEMPLATE;
 const targetSpreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
 
@@ -621,7 +622,8 @@ function importData(fromDate, toDate, company, dataLinks, identifierPattern, she
 
   
   // retrieve existing records in raw data sheet
-  const existingRecords = getRecords(sheetToImportTo.getRange('A2:F'));
+  //const existingRecords = getRecords(sheetToImportTo.getRange('A2:F'));
+  const existingRecords = getRecords(sheetToImportTo);
   v>2&& log(`${existingRecords.size} day-records exists in ${sheetToImportTo.getName()}`);
 
   const dates = datesBetween(fromDate, toDate);
@@ -870,16 +872,26 @@ function getCompanies(sheet, records=10, fields=4){
 return companies;
 }
   
-function getRecords(range){
-  //const validate = libraryGet('validateRecord');
-  const rangeValues = range.getValues();
+function getRecords(rawDataSheet){
+  const validate = libraryGet('validateRecord');
+  const getFieldNames = libraryGet('getFieldNames');
+
+  const inspectRange = rawDataSheet.getRange('A1:Z');
+  const rangeValues = inspectRange.getValues();
+  const rowCount = rangeValues.length;
+  v>1&& log(`Records in ${rawDataSheet.getName()}: ${rowCount}`);
+
   const records = new Map();
 
-
-  for (const row of rangeValues){
-
-   // validate(row);
-
+  for (let i=1; i<rangeValues.length; i++){
+    const row = rangeValues[i];
+    try {
+      validate(row, getFieldNames(rangeValues[0]));
+    } catch(e){
+      throw new TypeError(
+        `In getRecords(${rawDataSheet.getName()}), row:${i+1}, got: ${e.message}`
+        ); 
+    }
     const record = new Map();
     const date = row[0].toJSON();
     record.set('date', date);
@@ -892,6 +904,7 @@ function getRecords(range){
     records.get(date) && records.get(date).push(record)
       || records.set(date, [record]);
   }
+
   return records;
 }
 
@@ -1126,24 +1139,17 @@ if (required==='cleanRawData')
   v>0&& log('Procedure cleanRawData begin');
 
   const validate = libraryGet('validateRecord');
+  const getFieldNames = libraryGet('getFieldNames');
 
-  const dataRange = rawDataSheet.getRange('A1:Z');
-  const values = dataRange.getValues();
-  v>1&& log(`Records in ${rawDataSheet.getName()}: ${values.length}`);
+  const inspectRange = rawDataSheet.getRange('A1:Z');
+  const values = inspectRange.getValues();
+  const rowCount = values.length;
+  v>1&& log(`Records in ${rawDataSheet.getName()}: ${rowCount}`);
 
-  // object to store fieldName as key and associated index as value
-  // this object will be queried for every value and it seems JS is very fast at
-  // reading plain objects (key is string and value does not change)
-  // it seems it is better over a {Map} instance;
-  const fieldNames = values[0].reduce(
-    (indexes, fieldName, i) => {
-      // only fields that has a value are recorded
-      if (fieldName) indexes[fieldName] = i;
-      return indexes;
-    },
-    Object.create(null));
+  const fieldNames = getFieldNames(values[0]);
   v>2&& log(`Fields are: ${JSON.stringify(fieldNames)}`)
 
+/*
   const clean = (row, row_i) => {
     for (let i=0; i<row.length; i++){
 
@@ -1170,8 +1176,6 @@ if (required==='cleanRawData')
       }
     }
   };
-
-
   const cleanRecords = () => {
     for (let i=1; i<rangeValues.length; i++){
       const row = rangeValues[i];
@@ -1179,6 +1183,7 @@ if (required==='cleanRawData')
     }
     v>0&& log('All records are cleaned.');
   };
+*/
 
   for (let i=1; i<values.length; i++){
     // sheet row number
@@ -1256,9 +1261,27 @@ if (required==='validateRecord')
       throw new ReferenceError(`Validator function not set for field ${fieldName}`);
     validators.get(fieldName)(record[i]);
   }
-
   
 } // function validateRecord END
+
+if (required==='getFieldNames')
+  return function getFieldNames(firstRow)
+{
+  // object to store fieldName as key and associated index as value
+  // this object will be queried for every value and it seems JS is very fast at
+  // reading plain objects (key is string and value does not change)
+  // it seems it is better over a {Map} instance;
+  const fieldNames = firstRow.reduce(
+    (indexes, fieldName, i) => {
+      // only fields that has a value are recorded
+      if (fieldName) indexes[fieldName] = i;
+      return indexes;
+    },
+    Object.create(null));
+
+  return fieldNames;
+}
+
 
 } // function libraryGet END
 
