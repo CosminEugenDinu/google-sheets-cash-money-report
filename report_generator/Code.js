@@ -66,20 +66,22 @@ const company = companies.get(companyAlias);
 // cannot run without cleanRawData
 //const dataRecords = getRecords(dataRange);
 const getRecords = libraryGet('getRecords');
-//const dataRecords = getRecords(rawDataSheet);
+const dataRecords = getRecords(rawDataSheet);
 const template = TEMPLATE;
 const targetSpreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
 
 
 //---------------------------------------------------------------------------------
 
-procedure === 'renderReport' && renderReport(
-  fromDate,
-  toDate,
-  company,
-  dataRecords,
-  template,
-  targetSpreadsheet);
+if (procedure==='renderReport'){
+  const procedureDone = libraryGet('renderReport')(
+    fromDate,
+    toDate,
+    company,
+    dataRecords,
+    template,
+    targetSpreadsheet);
+}
 
 //---------------------------------------------------------------------------------
 
@@ -123,438 +125,7 @@ if (procedure === 'cleanRawData'){
 
 // -------------------------- library --------------------------------
 
-function renderReport(fromDate, toDate, company, dataRecords){
-v>0&& log('Procedure renderReport begin');
 
-/**
- * Class Element - is a piece of sheet... (cell, range)
- *
- * Depending on type of typeKey (e.g. 'target_element', 'label_element', 'frame_element'),
- * assigns specific properties (e.g. only element 'frame_element' has property 'extent')
- * When render method is called, that element produces effect on target sheet,
- * like setting a value in a cell or changing background color.
- */
-class Element {
-
-  /**
-   * @param {Object} elem - a TEMPLATE object containing properties specific to type=typeKey 
-   * @param {string} typeKey - key in {Map} tree where elem is stored
-   *   - represents the type of element;
-   *   - supported types can be verified with Element.getSupportedTypes();
-   */
-  constructor(typeKey, elem){
-
-    const typesProps = Element._typesProps
-
-    if (!this.supportedTypes.includes(typeKey))
-      throw new TypeError(`${typeKey} is not a valid element type`+
-        `supported types are: ${this.supportedTypes}`);
-    this._type = typeKey;
-
-    // reference to template element object
-    this._templateElement = elem;
-
-    for (const prop of Element._typesProps.get(typeKey))
-      this[prop] = null;
-   
-    for (const p in elem){
-      if (typesProps.get(this._type).includes(p)){
-        // if property is a reference to an array, so copy it
-        if (Array.isArray(elem[p])) this[p] = [...elem[p]];
-        else this[p] = elem[p];
-      } else {
-        throw new TypeError(`Property ${p} is not a supported by element type ${this._type}`);
-        }
-    }
-
-  }
-
-  get templateElement(){
-    return this._templateElement;
-  }
-
-  get type(){
-    return this._type;
-  }
-
-  get supportedTypes(){
-    return Element._supportedTypes;
-  }
-
-  static getSupportedTypes(){
-    return Element._supportedTypes;
-  }
-
-  /**
-   * Converts tuple array like [1, 2] into {string} key '1:2'
-   */
-  get keyCell(){
-    const [x, y] = this.cell;
-    const key = `${x}:${y}`;
-    return key;
-  }
-
-  /**
-   * Sets properties on range objects (e.g. set borders on cells in sheet)
-   *
-   * @param {Range} range - instance returned by sheet.getRange(x, y, ...)
-   * @param {string} property - key in {Map} properties (a local variable)
-   * @param {string|Number|Array} value - required by a range method
-   */
-  static setProperty(range, property, value){
-    const properties = new Map();
-    properties.set("background", ()=>range.setBackground(value));
-    properties.set("borders", ()=>range.setBorder(...value));
-    properties.set("fontSize", ()=>range.setFontSize(value));
-    properties.set("fontColor", ()=>range.setFontColor(value));
-    properties.set("fontWeight", ()=>range.setFontWeight(value));
-    properties.set("horizontalAlignment", ()=>range.setHorizontalAlignment(value));
-    properties.set("verticalAlignment", ()=>range.setVerticalAlignment(value));
-    
-    // set property on range object
-    properties.get(property)();
-  }
-
-  render(sheet){
-    if (!this.cell) throw new TypeError(`Cannot render element when element.cell=${cell}`);
-
-    let range = sheet.getRange(...this.cell);
-    //range.clear();
-    if (this.type === 'target_element'){
-      if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
-      range.setValue(this.value);
-    }
-    if (this.type === 'label_element'){
-      if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
-      range.setValue(this.value);
-    }
-    if (this.type === 'frame_element'){
-      if (this.extent) 
-        range = sheet.getRange(...this.cell, ...this.extent);
-    }
-
-    for (const prop in this.style)
-      Element.setProperty(range, prop, this.style[prop]);
-
-    return this; 
-  }
-
-}
-// assign class static variables
-Element._typesProps = new Map();
-Element._typesProps.set('target_element',
-  ['cell', 'offset', 'value', 'style']);
-Element._typesProps.set('label_element',
-  ['cell', 'offset', 'value', 'style']);
-Element._typesProps.set('frame_element',
-  ['cell', 'extent', 'style']);
-Element._supportedTypes = Array.from(Element._typesProps.keys());
-
-
-/**
- * 
- * @property {Array} dayValues - of {Map} record; day records retrieved by date key from records
- */
-class DailyReport {
-  /**
-   * @param {string} date
-   * @param {Map} company
-   * @param {Map} dataRecords - reference to all values
-   * @param {Function} calculateBalance - takes {string} date as arg and calculates balance till date
-   */
-  constructor(date, company, dataRecords, calculateBalance){
-    this.date = new Date(date);
-    this.company = company;
-    this.dayValues = dataRecords.get(date);
-
-    this.prevDateStr = ((today=this.date) => {
-      const date = new Date(today);
-      date.setDate(today.getDate() -1);
-      return date.toJSON();
-    })();
-
-    this.previous_balance = calculateBalance(this.prevDateStr);
-    
-    // if balance is negative, that means you spent cash money you didn't collect
-    if (this.previous_balance < 0){
-      const localPrevDate = new Date(this.prevDateStr).toLocaleDateString('ro-RO');
-      throw new Error(
-        `Previous day (${localPrevDate}) balance cannot be negative (${this.previous_balance}).`
-      ); 
-    }
-
-    const [total_input, total_day_output] = this.dayValues.reduce(
-      (in_out, record) => {
-        if (record.get('I_O_type') === 1){
-          in_out[0] += record.get('value');
-        } else if (record.get('I_O_type') === 0) {
-          in_out[1] += record.get('value');
-        }
-        return in_out;
-      }
-    ,[this.previous_balance, 0]);
-
-    this.total_input = total_input; 
-    this.total_day_output = total_day_output; 
-    this.day_balance = total_input - total_day_output;
-  }
-  
-  setColumnWidths(sheet, widths){
-    widths.map((w, i) => sheet.setColumnWidth(i+1, w));
-  }
-  setRowsHeight(sheet, numRows, height){
-    sheet.setRowHeights(1, numRows, height);
-  }
-
-  /**
-   * Utility function to convert {Object} template to a tree of {Map}.
-   * 
-   * @param {Object} obj - JSON-like object
-   * @param {Array} leafKeys - array of {string}, keys in obj that stores leaves 
-   * @returns {Array} [mapTree, leaves] - 
-   *   {Map} mapTree - a tree of {Map} instances, having {Element} leaves 
-   *   {Map} leaves - reference to every leaf, having keys {Array} [x,y],
-   *   that corresponds to 'cell' property of {Element}
-   */
-  static objToMap(obj, leafKeys, leaves=new Map()){
-    const mapTree = new Map();
-
-    for (const key in obj){
-      
-      if (leafKeys.includes(key)){
-        // if is a leaf
-        const element = new Element(key, obj[key]);
-        mapTree.set(key, element);
-        leaves.set(element.keyCell, element); 
-      } 
-      // does not recurses on arrays; are passed over
-      else if (isObject(obj[key])){
-        const [subTree, _leaves]  = DailyReport.objToMap(obj[key], leafKeys, leaves);
-        mapTree.set(key, subTree);
-      }
-        
-    }
-    return [mapTree, leaves]
-  }
-
-  render(toSheet, template){
-
-    if (!this.dayValues)
-      throw new TypeError(`Cannot render {DailyReport} instance if data values is ${this.dayValues}`);
-    
-    toSheet.setName(this.date.toLocaleDateString('ro-RO'));
-    this.setColumnWidths(toSheet, template._columnWidths);
-    const numRows = template._layoutRange[2];
-    this.setRowsHeight(toSheet, numRows, template._rowHeight);
-    toSheet.getRange(...template._layoutRange).clear();
-
-    const leafKeys = Element.getSupportedTypes();
-    // {Map} tree - having {Element} leaves
-    // {Map} elements - having key=element.keyCell, and value is {Element} leaf 
-    const [tree, elements] = DailyReport.objToMap(template, leafKeys);
-    // populate headers (general info displayed on top of report sheet)
-    tree.get('companyName').get('target_element').value = company.get('name');
-    tree.get('tax_id').get('target_element').value = company.get('tax_id');
-    tree.get('reg_num').get('target_element').value = company.get('reg_num');
-    
-
-    ((group=tree.get('previous_balance')) => {
-      const label = group.get('label_element');
-      const target = group.get('target_element');
-      // change label according to date (if date is 1st or not)
-      if (this.date.getDate() === 1)
-        label.value = label.value.replace(/\/ziua/i, '');
-      else 
-        label.value = label.value.replace(/luna\//i, '');
-      target.value = this.previous_balance;
-    })();
-
-    const numRecords = this.dayValues.length;
-
-    // {Map} record
-    for (const record of this.dayValues){
-      
-      for (const [parentKey, elementType] of tree.get('record')){
-        const defaultElement = elementType.get('target_element');
-        const newRecElem = new Element('target_element', defaultElement.templateElement);
-        // make a copy (a new record element)
-        // writing corresponding values from data record (dayValues)
-        if (parentKey === 'date') 
-          newRecElem.value = new Date(record.get('date')).toLocaleDateString('ro-RO');
-        if (parentKey === 'ref')
-          newRecElem.value = record.get('ref');
-        if (parentKey === 'doc_type')
-          newRecElem.value = record.get('doc_type');
-        if (parentKey === 'descr')
-          newRecElem.value = record.get('descr'); 
-        if (parentKey === 'input')
-          newRecElem.value = record.get('I_O_type') === 1 ? record.get('value') : '';
-        if (parentKey === 'output')
-          newRecElem.value = record.get('I_O_type') === 0 ? record.get('value') : '';
-        //updating cell position
-        newRecElem.cell[0] = defaultElement.cell[0];
-        //updating cell position
-        defaultElement.cell[0] += 1;
-        // push new element (replacing existing key)
-        elements.set(newRecElem.keyCell, newRecElem);
-        // push updated key
-        elements.set(defaultElement.keyCell, defaultElement);
-      }
-
-    }
-
-    // expand body frame accordingly
-    ((group=tree.get('body')) => {
-      const frame = group.get('frame_element');
-      frame.extent[0] += numRecords;
-    })();
-
-    ((group=tree.get('day_total_label')) => {
-      const label = group.get('label_element');
-      // replace '{}' with date in corresponding labels
-      label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
-      label.cell[0] += numRecords;
-      elements.set(label.keyCell, label);
-    })();
-
-    ((group=tree.get('day_total_targets')) => {
-      const total_input = group.get('total_input').get('target_element');
-      total_input.cell[0] += numRecords;
-      total_input.value = this.total_input;
-      elements.set(total_input.keyCell, total_input);
-
-      const total_day_output = group.get('total_day_output').get('target_element');
-      total_day_output.cell[0] += numRecords;
-      total_day_output.value = this.total_day_output;
-      elements.set(total_day_output.keyCell, total_day_output);
-    })();
-
-    ((group=tree.get('day_balance')) => {
-      const label = group.get('label_element');
-      label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
-      label.cell[0] += numRecords;
-      elements.set(label.keyCell, label);
-      const target = group.get('target_element');
-      target.cell[0] += numRecords;
-      target.value = this.day_balance;
-      elements.set(target.keyCell, target);
-    })();
-
-
-    // render all elements that has a value 
-    const renderedElements = new Map();
-    for (const [key, element] of elements){
-      const rendered = element.render(toSheet);
-      renderedElements.set(key, rendered);
-      }
-
-    return renderedElements;
-  }
-
-
-}
-
-
-class Report{
-  constructor(fromDate, toDate, company, dataRecords, template){
-    this.fromDate = fromDate;
-    this.toDate = toDate;
-    this.company = company;
-    this.dataRecords = dataRecords;
-    const recordDates = Array.from(dataRecords.keys());
-    recordDates.sort();
-    this.recordDates = recordDates;
-    this.template = template;
-  }
-
-  /**
-   * returns a closure to calculate balance till date
-   */
-  balanceCalculator(){
-    // closure variables
-    const sortedDates = this.recordDates;
-    const dataRecords = this.dataRecords;
-
-    return(
-      (currentDateStr) => {
-        if (! typeof currnetDateStr === 'string')
-          throw new TypeError(
-            `Typeof currentDateStr is ${typeof currentDateStr}. Expected string.`);
-        if (isNaN(new Date(currentDateStr)))
-          throw new TypeError(
-            `${typeof currentDateStr} ${currentDateStr} is not a valid date JSON string.`);
-
-        let total = 0;
-        for (const dateStr of sortedDates){
-          if (currentDateStr < dateStr)
-            return total;
-          const dayRecords = dataRecords.get(dateStr);
-          total += dayRecords.reduce((dayTotal, record) => {
-
-            const recordValue = record.get('value');
-            if (typeof recordValue !== 'number')
-              throw new TypeError(
-                `Expected Number! Typeof record value ${recordValue}: ${typeof recordValue}. `+
-                `Date key: ${dateStr}. Local Date: ${new Date(dateStr).toLocaleDateString('ro-RO')}`);
-
-            if (record.get('I_O_type') === 1)
-              return dayTotal + recordValue;
-            if (record.get('I_O_type') === 0)
-              return dayTotal - recordValue;
-        }, 0);
-      }
-      return total;
-      }
-    );
-  }
-  
-  render(targetSpreadsheet, template){
-    
-    /* for every date between fromDate and toDate:
-     *   collect dataRecords and group by date in a {Map},
-     *   generate an instance of {DailyReport},
-     *   create a new {Sheet} instance in {Spreadsheet} and name it with date,
-     *   render every dayReport to sheet according with date,
-     *   and DONE
-     */
-
-    // delete existing sheets except first
-    v>2&& log(`Deleting existing report sheets except first`);
-    targetSpreadsheet.getSheets().forEach(sheet =>{
-      if (sheet.getIndex() === 1) 
-        // cover sheet 
-        sheet.setName('Cover');
-      else
-        targetSpreadsheet.deleteSheet(sheet);
-    }
-    );
-    const dates = datesBetween(fromDate, toDate);
-    v>2&& log(`Rendering reports between ${fromDate.toLocaleDateString('ro-RO')} and ${toDate.toLocaleDateString('ro-RO')}`);
-
-    let sheetIndex = 1
-    for (const date of dates){
-      const dayTrades = dataRecords.get(date);
-      if (!dayTrades) continue;
-      const sheet = targetSpreadsheet.insertSheet(sheetIndex++);
-      const dayReport = new DailyReport(date, company, dataRecords, this.balanceCalculator());
-      dayReport.render(sheet, this.template);
-      v>2&& log(`Day report ${new Date(date).toLocaleDateString('ro-RO')} rendered!`);
-    }
-
-    return;
-  }
-
-
-}
-
-//----------------------------------------------------------------
-//-------------- render all reports ------------------------------
-const report = new Report(fromDate, toDate, company, dataRecords, template)
-report.render(targetSpreadsheet);
-//================================================================
-
-v>0&& log('Procedure renderReport END');
-} // renderReport END
 
 
 // ----------Global functions (in makeReport scope)---------------
@@ -978,6 +549,448 @@ if (required==='settings')
   
 } // class Settings END
 
+
+if (required==='renderReport')
+  return function renderReport(
+    fromDate,
+    toDate,
+    company,
+    dataRecords,
+    template,
+    targetSpreadsheet)
+{
+  v>0&& log('Procedure renderReport begin');
+
+  /**
+   * Class Element - is a piece of sheet... (cell, range)
+   *
+   * Depending on type of typeKey (e.g. 'target_element', 'label_element', 'frame_element'),
+   * assigns specific properties (e.g. only element 'frame_element' has property 'extent')
+   * When render method is called, that element produces effect on target sheet,
+   * like setting a value in a cell or changing background color.
+   */
+  class Element {
+
+    /**
+     * @param {Object} elem - a TEMPLATE object containing properties specific to type=typeKey 
+     * @param {string} typeKey - key in {Map} tree where elem is stored
+     *   - represents the type of element;
+     *   - supported types can be verified with Element.getSupportedTypes();
+     */
+    constructor(typeKey, elem){
+
+      const typesProps = Element._typesProps
+
+      if (!this.supportedTypes.includes(typeKey))
+        throw new TypeError(`${typeKey} is not a valid element type`+
+          `supported types are: ${this.supportedTypes}`);
+      this._type = typeKey;
+
+      // reference to template element object
+      this._templateElement = elem;
+
+      for (const prop of Element._typesProps.get(typeKey))
+        this[prop] = null;
+     
+      for (const p in elem){
+        if (typesProps.get(this._type).includes(p)){
+          // if property is a reference to an array, so copy it
+          if (Array.isArray(elem[p])) this[p] = [...elem[p]];
+          else this[p] = elem[p];
+        } else {
+          throw new TypeError(`Property ${p} is not a supported by element type ${this._type}`);
+          }
+      }
+
+    }
+
+    get templateElement(){
+      return this._templateElement;
+    }
+
+    get type(){
+      return this._type;
+    }
+
+    get supportedTypes(){
+      return Element._supportedTypes;
+    }
+
+    static getSupportedTypes(){
+      return Element._supportedTypes;
+    }
+
+    /**
+     * Converts tuple array like [1, 2] into {string} key '1:2'
+     */
+    get keyCell(){
+      const [x, y] = this.cell;
+      const key = `${x}:${y}`;
+      return key;
+    }
+
+    /**
+     * Sets properties on range objects (e.g. set borders on cells in sheet)
+     *
+     * @param {Range} range - instance returned by sheet.getRange(x, y, ...)
+     * @param {string} property - key in {Map} properties (a local variable)
+     * @param {string|Number|Array} value - required by a range method
+     */
+    static setProperty(range, property, value){
+      const properties = new Map();
+      properties.set("background", ()=>range.setBackground(value));
+      properties.set("borders", ()=>range.setBorder(...value));
+      properties.set("fontSize", ()=>range.setFontSize(value));
+      properties.set("fontColor", ()=>range.setFontColor(value));
+      properties.set("fontWeight", ()=>range.setFontWeight(value));
+      properties.set("horizontalAlignment", ()=>range.setHorizontalAlignment(value));
+      properties.set("verticalAlignment", ()=>range.setVerticalAlignment(value));
+      
+      // set property on range object
+      properties.get(property)();
+    }
+
+    render(sheet){
+      if (!this.cell) throw new TypeError(`Cannot render element when element.cell=${cell}`);
+
+      let range = sheet.getRange(...this.cell);
+      //range.clear();
+      if (this.type === 'target_element'){
+        if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
+        range.setValue(this.value);
+      }
+      if (this.type === 'label_element'){
+        if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
+        range.setValue(this.value);
+      }
+      if (this.type === 'frame_element'){
+        if (this.extent) 
+          range = sheet.getRange(...this.cell, ...this.extent);
+      }
+
+      for (const prop in this.style)
+        Element.setProperty(range, prop, this.style[prop]);
+
+      return this; 
+    }
+
+  }
+  // assign class static variables
+  Element._typesProps = new Map();
+  Element._typesProps.set('target_element',
+    ['cell', 'offset', 'value', 'style']);
+  Element._typesProps.set('label_element',
+    ['cell', 'offset', 'value', 'style']);
+  Element._typesProps.set('frame_element',
+    ['cell', 'extent', 'style']);
+  Element._supportedTypes = Array.from(Element._typesProps.keys());
+
+
+  /**
+   * 
+   * @property {Array} dayValues - of {Map} record; day records retrieved by date key from records
+   */
+  class DailyReport {
+    /**
+     * @param {string} date
+     * @param {Map} company
+     * @param {Map} dataRecords - reference to all values
+     * @param {Function} calculateBalance - takes {string} date as arg and calculates balance till date
+     */
+    constructor(date, company, dataRecords, calculateBalance){
+      this.date = new Date(date);
+      this.company = company;
+      this.dayValues = dataRecords.get(date);
+
+      this.prevDateStr = ((today=this.date) => {
+        const date = new Date(today);
+        date.setDate(today.getDate() -1);
+        return date.toJSON();
+      })();
+
+      this.previous_balance = calculateBalance(this.prevDateStr);
+      
+      // if balance is negative, that means you spent cash money you didn't collect
+      if (this.previous_balance < 0){
+        const localPrevDate = new Date(this.prevDateStr).toLocaleDateString('ro-RO');
+        throw new Error(
+          `Previous day (${localPrevDate}) balance cannot be negative (${this.previous_balance}).`
+        ); 
+      }
+
+      const [total_input, total_day_output] = this.dayValues.reduce(
+        (in_out, record) => {
+          if (record.get('I_O_type') === 1){
+            in_out[0] += record.get('value');
+          } else if (record.get('I_O_type') === 0) {
+            in_out[1] += record.get('value');
+          }
+          return in_out;
+        }
+      ,[this.previous_balance, 0]);
+
+      this.total_input = total_input; 
+      this.total_day_output = total_day_output; 
+      this.day_balance = total_input - total_day_output;
+    }
+    
+    setColumnWidths(sheet, widths){
+      widths.map((w, i) => sheet.setColumnWidth(i+1, w));
+    }
+    setRowsHeight(sheet, numRows, height){
+      sheet.setRowHeights(1, numRows, height);
+    }
+
+    /**
+     * Utility function to convert {Object} template to a tree of {Map}.
+     * 
+     * @param {Object} obj - JSON-like object
+     * @param {Array} leafKeys - array of {string}, keys in obj that stores leaves 
+     * @returns {Array} [mapTree, leaves] - 
+     *   {Map} mapTree - a tree of {Map} instances, having {Element} leaves 
+     *   {Map} leaves - reference to every leaf, having keys {Array} [x,y],
+     *   that corresponds to 'cell' property of {Element}
+     */
+    static objToMap(obj, leafKeys, leaves=new Map()){
+      const mapTree = new Map();
+
+      for (const key in obj){
+        
+        if (leafKeys.includes(key)){
+          // if is a leaf
+          const element = new Element(key, obj[key]);
+          mapTree.set(key, element);
+          leaves.set(element.keyCell, element); 
+        } 
+        // does not recurses on arrays; are passed over
+        else if (isObject(obj[key])){
+          const [subTree, _leaves]  = DailyReport.objToMap(obj[key], leafKeys, leaves);
+          mapTree.set(key, subTree);
+        }
+          
+      }
+      return [mapTree, leaves]
+    }
+
+    render(toSheet, template){
+
+      if (!this.dayValues)
+        throw new TypeError(`Cannot render {DailyReport} instance if data values is ${this.dayValues}`);
+      
+      toSheet.setName(this.date.toLocaleDateString('ro-RO'));
+      this.setColumnWidths(toSheet, template._columnWidths);
+      const numRows = template._layoutRange[2];
+      this.setRowsHeight(toSheet, numRows, template._rowHeight);
+      toSheet.getRange(...template._layoutRange).clear();
+
+      const leafKeys = Element.getSupportedTypes();
+      // {Map} tree - having {Element} leaves
+      // {Map} elements - having key=element.keyCell, and value is {Element} leaf 
+      const [tree, elements] = DailyReport.objToMap(template, leafKeys);
+      // populate headers (general info displayed on top of report sheet)
+      tree.get('companyName').get('target_element').value = company.get('name');
+      tree.get('tax_id').get('target_element').value = company.get('tax_id');
+      tree.get('reg_num').get('target_element').value = company.get('reg_num');
+      
+
+      ((group=tree.get('previous_balance')) => {
+        const label = group.get('label_element');
+        const target = group.get('target_element');
+        // change label according to date (if date is 1st or not)
+        if (this.date.getDate() === 1)
+          label.value = label.value.replace(/\/ziua/i, '');
+        else 
+          label.value = label.value.replace(/luna\//i, '');
+        target.value = this.previous_balance;
+      })();
+
+      const numRecords = this.dayValues.length;
+
+      // {Map} record
+      for (const record of this.dayValues){
+        
+        for (const [parentKey, elementType] of tree.get('record')){
+          const defaultElement = elementType.get('target_element');
+          const newRecElem = new Element('target_element', defaultElement.templateElement);
+          // make a copy (a new record element)
+          // writing corresponding values from data record (dayValues)
+          if (parentKey === 'date') 
+            newRecElem.value = new Date(record.get('date')).toLocaleDateString('ro-RO');
+          if (parentKey === 'ref')
+            newRecElem.value = record.get('ref');
+          if (parentKey === 'doc_type')
+            newRecElem.value = record.get('doc_type');
+          if (parentKey === 'descr')
+            newRecElem.value = record.get('descr'); 
+          if (parentKey === 'input')
+            newRecElem.value = record.get('I_O_type') === 1 ? record.get('value') : '';
+          if (parentKey === 'output')
+            newRecElem.value = record.get('I_O_type') === 0 ? record.get('value') : '';
+          //updating cell position
+          newRecElem.cell[0] = defaultElement.cell[0];
+          //updating cell position
+          defaultElement.cell[0] += 1;
+          // push new element (replacing existing key)
+          elements.set(newRecElem.keyCell, newRecElem);
+          // push updated key
+          elements.set(defaultElement.keyCell, defaultElement);
+        }
+
+      }
+
+      // expand body frame accordingly
+      ((group=tree.get('body')) => {
+        const frame = group.get('frame_element');
+        frame.extent[0] += numRecords;
+      })();
+
+      ((group=tree.get('day_total_label')) => {
+        const label = group.get('label_element');
+        // replace '{}' with date in corresponding labels
+        label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
+        label.cell[0] += numRecords;
+        elements.set(label.keyCell, label);
+      })();
+
+      ((group=tree.get('day_total_targets')) => {
+        const total_input = group.get('total_input').get('target_element');
+        total_input.cell[0] += numRecords;
+        total_input.value = this.total_input;
+        elements.set(total_input.keyCell, total_input);
+
+        const total_day_output = group.get('total_day_output').get('target_element');
+        total_day_output.cell[0] += numRecords;
+        total_day_output.value = this.total_day_output;
+        elements.set(total_day_output.keyCell, total_day_output);
+      })();
+
+      ((group=tree.get('day_balance')) => {
+        const label = group.get('label_element');
+        label.value = replaceCurly(label.value, this.date.toLocaleDateString('ro-RO')); 
+        label.cell[0] += numRecords;
+        elements.set(label.keyCell, label);
+        const target = group.get('target_element');
+        target.cell[0] += numRecords;
+        target.value = this.day_balance;
+        elements.set(target.keyCell, target);
+      })();
+
+
+      // render all elements that has a value 
+      const renderedElements = new Map();
+      for (const [key, element] of elements){
+        const rendered = element.render(toSheet);
+        renderedElements.set(key, rendered);
+        }
+
+      return renderedElements;
+    }
+
+
+  }
+
+
+  class Report{
+    constructor(fromDate, toDate, company, dataRecords, template){
+      this.fromDate = fromDate;
+      this.toDate = toDate;
+      this.company = company;
+      this.dataRecords = dataRecords;
+      const recordDates = Array.from(dataRecords.keys());
+      recordDates.sort();
+      this.recordDates = recordDates;
+      this.template = template;
+    }
+
+    /**
+     * returns a closure to calculate balance till date
+     */
+    balanceCalculator(){
+      // closure variables
+      const sortedDates = this.recordDates;
+      const dataRecords = this.dataRecords;
+
+      return(
+        (currentDateStr) => {
+          if (! typeof currnetDateStr === 'string')
+            throw new TypeError(
+              `Typeof currentDateStr is ${typeof currentDateStr}. Expected string.`);
+          if (isNaN(new Date(currentDateStr)))
+            throw new TypeError(
+              `${typeof currentDateStr} ${currentDateStr} is not a valid date JSON string.`);
+
+          let total = 0;
+          for (const dateStr of sortedDates){
+            if (currentDateStr < dateStr)
+              return total;
+            const dayRecords = dataRecords.get(dateStr);
+            total += dayRecords.reduce((dayTotal, record) => {
+
+              const recordValue = record.get('value');
+              if (typeof recordValue !== 'number')
+                throw new TypeError(
+                  `Expected Number! Typeof record value ${recordValue}: ${typeof recordValue}. `+
+                  `Date key: ${dateStr}. Local Date: ${new Date(dateStr).toLocaleDateString('ro-RO')}`);
+
+              if (record.get('I_O_type') === 1)
+                return dayTotal + recordValue;
+              if (record.get('I_O_type') === 0)
+                return dayTotal - recordValue;
+          }, 0);
+        }
+        return total;
+        }
+      );
+    }
+    
+    render(targetSpreadsheet, template){
+      
+      /* for every date between fromDate and toDate:
+       *   collect dataRecords and group by date in a {Map},
+       *   generate an instance of {DailyReport},
+       *   create a new {Sheet} instance in {Spreadsheet} and name it with date,
+       *   render every dayReport to sheet according with date,
+       *   and DONE
+       */
+
+      // delete existing sheets except first
+      v>2&& log(`Deleting existing report sheets except first`);
+      targetSpreadsheet.getSheets().forEach(sheet =>{
+        if (sheet.getIndex() === 1) 
+          // cover sheet 
+          sheet.setName('Cover');
+        else
+          targetSpreadsheet.deleteSheet(sheet);
+      }
+      );
+      const dates = datesBetween(fromDate, toDate);
+      v>2&& log(`Rendering reports between ${fromDate.toLocaleDateString('ro-RO')} and ${toDate.toLocaleDateString('ro-RO')}`);
+
+      let sheetIndex = 1
+      for (const date of dates){
+        const dayTrades = dataRecords.get(date);
+        if (!dayTrades) continue;
+        const sheet = targetSpreadsheet.insertSheet(sheetIndex++);
+        const dayReport = new DailyReport(date, company, dataRecords, this.balanceCalculator());
+        dayReport.render(sheet, this.template);
+        v>2&& log(`Day report ${new Date(date).toLocaleDateString('ro-RO')} rendered!`);
+      }
+
+      return;
+    }
+
+
+  }
+
+  //----------------------------------------------------------------
+  //-------------- render all reports ------------------------------
+  const report = new Report(fromDate, toDate, company, dataRecords, template)
+  report.render(targetSpreadsheet);
+  //================================================================
+
+  v>0&& log('Procedure renderReport END');
+} // renderReport END
+
 /**
  * Searches for company data records in provided links to standalone spreadsheets,
  * and populate corresponding rawDataSheet.
@@ -1099,7 +1112,7 @@ if (required==='importData') return function importData(
   v>2&& log(`Writing new values...`);
   rawDataRange.setValues(rawValues);
 
-v>0&& log('Procedure importData END');
+  v>0&& log('Procedure importData END');
 } // importData END
 
 
