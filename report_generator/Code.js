@@ -24,6 +24,11 @@ const repGenSprSheet = SpreadsheetApp.openById(REPORT_GENERATOR_SPREADSHEET_ID);
 const interfaceSheet = repGenSprSheet.getSheetByName(INTERFACE_SHEET_NAME);
 const settingsSheet = repGenSprSheet.getSheetByName(SETTINGS_SHEET_NAME);
 
+const verbosity = interfaceSheet.getSheetValues(8,5,1,1)[0][0];
+// v=0 - critical, v=1 - informal, v=2 - too verbose
+const v = +verbosity;
+
+
 const settings = new Settings(settingsSheet, 50, 1000);
 
 const varIndex = settings
@@ -53,9 +58,6 @@ const procedure = interfaceSheet.getSheetValues(8,1,1,1)[0][0];
 const companyAlias = interfaceSheet.getSheetValues(8,2,1,1)[0][0];
 const [fromDate, toDate] = interfaceSheet.getSheetValues(8,3,1,2)[0];
 
-const verbosity = interfaceSheet.getSheetValues(8,5,1,1)[0][0];
-// v=0 - critical, v=1 - informal, v=2 - too verbose
-const v = +verbosity;
 
 // data source sheet corresponds with chosen company alias from drop-down
 const rawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SUFFIX);
@@ -477,9 +479,11 @@ function defaultTemplate(){
 }
 
 function libraryGet(required){
+
+// library members dictionary
+const library = new Map();
   
-if (required==='settings')
-  return class Settings{
+class Settings{
   constructor(settingsSheet, rowLim, colLim){
     const range = settingsSheet.getRange(1,1,rowLim,colLim);
     const sheetValues = settingsSheet.getSheetValues(1,1,rowLim,colLim);
@@ -550,15 +554,13 @@ if (required==='settings')
 } // class Settings END
 
 
-if (required==='renderReport')
-  return function renderReport(
+function renderReport(
     fromDate,
     toDate,
     company,
     dataRecords,
     template,
-    targetSpreadsheet)
-{
+    targetSpreadsheet){
   v>0&& log('Procedure renderReport begin');
 
   /**
@@ -999,14 +1001,13 @@ if (required==='renderReport')
  * @param {Iterable} dataLinks - records with links (urls) of google sheets
  *      - {string} like 'https://docs.google.com/spreadsheets/d/<< sheetId >>/edit#gid=xxxxxxxxxx';
  */
-if (required==='importData') return function importData(
+function importData(
     fromDate,
     toDate,
     company,
     dataLinks,
     identifierPattern,
-    sheetToImportTo)
-{
+    sheetToImportTo){
   v>0&& log('Procedure importData begin');
   v>2&& log(`Company alias: ${company.get('alias')}`);
   const getRecords = libraryGet('getRecords');
@@ -1116,9 +1117,7 @@ if (required==='importData') return function importData(
 } // importData END
 
 
-if (required==='cleanRawData')
-  return function cleanRawData(fromDate, toDate, company, rawDataSheet)
-{
+function cleanRawData(fromDate, toDate, company, rawDataSheet){
   v>0&& log('Procedure cleanRawData begin');
 
   const validate = libraryGet('validateRecord');
@@ -1186,13 +1185,11 @@ if (required==='cleanRawData')
   v>0&& log('Procedure cleanRawData END');
 } // procedure cleanRawData END
 
-if (required==='validateRecord')
   /**
    * @param {Array} record
    * @param {Object} fieldNames
    */
-  return function validateRecord(record, fieldNames)
-{
+function validateRecord(record, fieldNames){
   const validators = new Map();
   validators.set('date',
     date => {
@@ -1247,9 +1244,7 @@ if (required==='validateRecord')
   
 } // function validateRecord END
 
-if (required==='getFieldNames')
-  return function getFieldNames(firstRow)
-{
+function getFieldNames(firstRow){
   // object to store fieldName as key and associated index as value
   // this object will be queried for every value and it seems JS is very fast at
   // reading plain objects (key is string and value does not change)
@@ -1265,9 +1260,7 @@ if (required==='getFieldNames')
   return fieldNames;
 }
 
-if (required==='getRecords')
-  return function getRecords(rawDataSheet)
-{
+function getRecords(rawDataSheet){
   const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
 
@@ -1303,7 +1296,16 @@ if (required==='getRecords')
   return records;
 } // function getRecords END
 
+library.set('settings', Settings);
+library.set('renderReport', renderReport);
+library.set('importData', importData);
+library.set('cleanRawData', cleanRawData);
+library.set('validateRecord', validateRecord);
+library.set('getFieldNames', getFieldNames);
+library.set('getRecords', getRecords);
 
+// returns required function or class
+return library.get(required);
 } // function libraryGet END
 
 } // makeReport END
