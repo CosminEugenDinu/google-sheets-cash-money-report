@@ -6,6 +6,7 @@
 function main () {
 
 const Settings = libraryGet('settings');
+const getRecords = libraryGet('getRecords');
 
 // global settings variables
 const REPORT_GENERATOR_SPREADSHEET_ID = "1nDNPcpgP9TlAcTSKASwFxuQQswdAI7Wm3I8Z-7rSGnE";
@@ -13,7 +14,6 @@ const INTERFACE_SHEET_NAME = "Interface";
 const SETTINGS_SHEET_NAME = "settings";
 const RAWDATA_SHEET_SUFFIX = "_rawdata";
 
-const TEMPLATE = defaultTemplate();
 
 // instantiate log function
 const log = Log(REPORT_GENERATOR_SPREADSHEET_ID, 0, [10,5]);
@@ -57,67 +57,75 @@ updateRawDataSheetNames(rawDataSheets, computedRawDataSheetNames);
 const procedure = interfaceSheet.getSheetValues(8,1,1,1)[0][0];
 const companyAlias = interfaceSheet.getSheetValues(8,2,1,1)[0][0];
 const [fromDate, toDate] = interfaceSheet.getSheetValues(8,3,1,2)[0];
+const company = companies.get(companyAlias);
 
 // data source sheet corresponds with chosen company alias from drop-down
 const rawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SUFFIX);
-//const dataRange = rawDataSheet.getRange('A2:F');
-
-const company = companies.get(companyAlias);
-// cannot run without cleanRawData
-//const dataRecords = getRecords(dataRange);
-const getRecords = libraryGet('getRecords');
-const dataRecords = getRecords(rawDataSheet);
-const template = TEMPLATE;
-const targetSpreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
-
 
 //---------------------------------------------------------------------------------
 
 if (procedure==='renderReport'){
-  const procedureDone = libraryGet('renderReport')(
-    fromDate,
-    toDate,
-    company,
-    dataRecords,
-    template,
-    targetSpreadsheet);
+  let args;
+  try{
+    const dataRecords = getRecords(rawDataSheet);
+    const template = defaultTemplate();
+    const targetSpreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
+
+    args = [fromDate, toDate, company, dataRecords, template, targetSpreadsheet];
+
+  } catch(e){
+    throw new Error(
+      `When initializing arguments for procedure ${procedure}, got:\n${e.message}`);
+  }
+
+  try{
+    libraryGet(procedure)(...args);
+  } catch (e) {
+    throw new Error(`Procedure ${procedure} failed with:\n${e.message}`);
+  }
 }
 
 //---------------------------------------------------------------------------------
 
-//const dataLinks = settingsSheet.getSheetValues(1,16,1000,3);
-// spreadsheet links iterable
-const dataLinks = settings.getField(`link.${companyAlias}`).getValues();
-
-// this pattern is uset to search records in source spreadsheets (dataLinks);
-const identifierPattern = settings.getField('procedure.variable.value').getByIndex(
-  settings.getField('procedure.variable.name')
-  .getByValue('importData.identifierPattern')
-  );
-const [sheetToImportTo] = rawDataSheets.filter(
-  sheet => sheet.getName() === company.get('alias')+RAWDATA_SHEET_SUFFIX
-  )
-
 if (procedure==='importData'){
-  const procedureDone = libraryGet(procedure)(
-    fromDate,
-    toDate,
-    company,
-    dataLinks,
-    identifierPattern,
-    sheetToImportTo
-  );
+  let args;
+  try{
+    // spreadsheet links iterable
+    const dataLinks = settings.getField(`link.${companyAlias}`).getValues();
+    // this pattern is uset to search records in source spreadsheets (dataLinks);
+    const identifierPattern = settings.getField('procedure.variable.value').getByIndex(
+      settings.getField('procedure.variable.name')
+      .getByValue('importData.identifierPattern')
+      );
+    const [sheetToImportTo] = rawDataSheets.filter(
+      sheet => sheet.getName() === company.get('alias')+RAWDATA_SHEET_SUFFIX
+      );
+
+    args = [fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo];
+
+  } catch(e){
+    throw new Error(
+      `When initializing arguments for procedure ${procedure}, got:\n${e.message}`);
+  }
+
+  try{
+    libraryGet(procedure)(...args);
+  } catch(e){
+    throw new Error(`Procedure ${procedure} failed with:\n${e.message}`);
+  }
 }
 
 //---------------------------------------------------------------------------------
 
 if (procedure === 'cleanRawData'){
-  const procedureDone = libraryGet(procedure)(
-    fromDate,
-    toDate,
-    company,
-    rawDataSheet
-  );
+
+  const args = [fromDate, toDate, company, rawDataSheet];
+
+  try{
+    libraryGet(procedure)(...args);
+  } catch(e){
+    throw new Error(`Procedure ${procedure} failed with:\n${e.message}`);
+  }
 }
 
 //---------------------------------------------------------------------------------
@@ -1117,6 +1125,7 @@ function importData(
 
 function cleanRawData(fromDate, toDate, company, rawDataSheet){
   v>0&& log('Procedure cleanRawData begin');
+  throw new Error('get here - cleanRawData');
 
   const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
@@ -1173,7 +1182,7 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
       validate(row, fieldNames);
     } catch(e) {
       log(e);
-      throw new Error('ceva' + e.message);
+      throw new Error('ceva from clean ' + e.message);
     }
     if (i === 3) break;
 
