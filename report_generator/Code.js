@@ -3,7 +3,7 @@
  * Main function, call from sheet button, where it is assigned
  * This function is considered global
  */
-function makeReport() {
+function main () {
 
 const Settings = libraryGet('settings');
 
@@ -1185,10 +1185,10 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   v>0&& log('Procedure cleanRawData END');
 } // procedure cleanRawData END
 
-  /**
-   * @param {Array} record
-   * @param {Object} fieldNames
-   */
+/**
+ * @param {Array} record
+ * @param {Object} fieldNames
+ */
 function validateRecord(record, fieldNames){
   const validators = new Map();
   validators.set('date',
@@ -1308,7 +1308,7 @@ library.set('getRecords', getRecords);
 return library.get(required);
 } // function libraryGet END
 
-} // makeReport END
+} // main END
 
 
 
