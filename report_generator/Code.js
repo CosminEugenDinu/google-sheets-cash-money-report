@@ -58,11 +58,9 @@ const procedure = interfaceSheet.getSheetValues(8,1,1,1)[0][0];
 const companyAlias = interfaceSheet.getSheetValues(8,2,1,1)[0][0];
 const [fromDate, toDate] = interfaceSheet.getSheetValues(8,3,1,2)[0];
 
-
 // data source sheet corresponds with chosen company alias from drop-down
 const rawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SUFFIX);
 //const dataRange = rawDataSheet.getRange('A2:F');
-
 
 const company = companies.get(companyAlias);
 // cannot run without cleanRawData
