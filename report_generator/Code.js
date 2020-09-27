@@ -7,6 +7,7 @@ function main () {
 
 const Settings = libraryGet('settings');
 const getRecords = libraryGet('getRecords');
+const Log = libraryGet('Log');
 
 // global settings variables
 const REPORT_GENERATOR_SPREADSHEET_ID = "1nDNPcpgP9TlAcTSKASwFxuQQswdAI7Wm3I8Z-7rSGnE";
@@ -118,6 +119,7 @@ if (procedure==='importData'){
 //---------------------------------------------------------------------------------
 
 if (procedure === 'cleanRawData'){
+  v>0&& log('Procedure cleanRawData begin');
 
   const args = [fromDate, toDate, company, rawDataSheet];
 
@@ -126,6 +128,7 @@ if (procedure === 'cleanRawData'){
   } catch(e){
     throw new Error(`Procedure ${procedure} failed with:\n${e.message}`);
   }
+  v>0&& log('Procedure cleanRawData END');
 }
 
 } // main END
@@ -340,36 +343,6 @@ function updateRawDataSheetNames(rawDataSheets, computedNames){
       )
 }
 
-/**
- * Logging function - logs to specified cell
- *      - instantiate with const log = Log(spreadsheetId, sheetIndex, cellPos);
- *      - usage: log("Welcome to log console!");
- *
- * @param {Sheet} spreadsheetId - https://docs.google.com/spreadsheets/d/spreadsheetId/edit#gid=0
- * @param {Number} sheetIndex - numeric index (including 0) of {Sheet} targeted
- * @param {Array} cellPos - tuple array with cell position [x, y] - console output cell
- */
-function Log(spreadsheetId, sheetIndex, cellPos){
-  const spreadSheet = SpreadsheetApp.openById(spreadsheetId);
-  const sheet = spreadSheet.getSheets()[sheetIndex];
-  // clear console space
-  sheet.getRange(...cellPos,8,3).clear();
-  const range = sheet.getRange(...cellPos,8,3).merge();
-  const cell = range.getCell(1,1);
-  cell.setBackground("black");
-  cell.setFontColor("white");
-  cell.setVerticalAlignment("top");
-  
-  const logs = [];
-
-  const log = (...args) => {
-    logs.push(args.toString());
-    cell.setValue('> '+logs.join('\n> '));
-    // returns true to permit chaining like: log('something') && another_statement;
-    return true;
-  }
-  return log;
-}
 
 
 function isObject(type){
@@ -495,6 +468,39 @@ function libraryGet(required){
 
 // library members dictionary
 const library = new Map();
+
+/**
+ * Logging function - logs to specified cell
+ *      - instantiate with const log = Log(spreadsheetId, sheetIndex, cellPos);
+ *      - usage: log("Welcome to log console!");
+ *
+ * @param {Sheet} spreadsheetId - https://docs.google.com/spreadsheets/d/spreadsheetId/edit#gid=0
+ * @param {Number} sheetIndex - numeric index (including 0) of {Sheet} targeted
+ * @param {Array} cellPos - tuple array with cell position [x, y] - console output cell
+ */
+function Log(spreadsheetId, sheetIndex, cellPos){
+
+  const spreadSheet = SpreadsheetApp.openById(spreadsheetId);
+  const sheet = spreadSheet.getSheets()[sheetIndex];
+  // clear console space
+  sheet.getRange(...cellPos,8,3).clear();
+  const range = sheet.getRange(...cellPos,8,3).merge();
+  const cell = range.getCell(1,1);
+  cell.setBackground("black");
+  cell.setFontColor("white");
+  cell.setVerticalAlignment("top");
+  
+  const logs = [];
+
+  const log = (...args) => {
+    logs.push(args.toString());
+    cell.setValue('> '+logs.join('\n> '));
+    // returns true to permit chaining like: log('something') && another_statement;
+    return true;
+  }
+
+  return log;
+}
   
 class Settings{
   constructor(settingsSheet, rowLim, colLim){
@@ -1131,7 +1137,6 @@ function importData(
 
 
 function cleanRawData(fromDate, toDate, company, rawDataSheet){
-  v>0&& log('Procedure cleanRawData begin');
 
   const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
@@ -1139,10 +1144,8 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   const inspectRange = rawDataSheet.getRange('A1:Z');
   const values = inspectRange.getValues();
   const rowCount = values.length;
-  v>1&& log(`Records in ${rawDataSheet.getName()}: ${rowCount}`);
 
   const fieldNames = getFieldNames(values[0]);
-  v>2&& log(`Fields are: ${JSON.stringify(fieldNames)}`)
 
 /*
   const clean = (row, row_i) => {
@@ -1187,7 +1190,6 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
     try {
       validate(row, fieldNames);
     } catch(e) {
-      log(e);
       throw new Error('ceva from clean ' + e.message);
     }
     if (i === 3) break;
@@ -1195,7 +1197,6 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   }
 
 
-  v>0&& log('Procedure cleanRawData END');
 } // procedure cleanRawData END
 
 class FieldValidator{
@@ -1469,6 +1470,7 @@ library.set('validateRecord', validateRecord);
 library.set('getFieldNames', getFieldNames);
 library.set('getRecords', getRecords);
 library.set('FieldValidator', FieldValidator);
+library.set('Log', Log);
 library.set('dummy_func', dummy_func);
 
 // returns required function or class
