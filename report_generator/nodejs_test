@@ -1,0 +1,12 @@
+
+const assert = require('assert');
+const toTest = require('./Code.js');
+
+
+
+function test_run(){
+  assert.equal(toTest.__get__('f')(10), 21);
+  
+}
+
+test_run();

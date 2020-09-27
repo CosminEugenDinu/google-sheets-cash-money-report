@@ -1125,7 +1125,6 @@ function importData(
 
 function cleanRawData(fromDate, toDate, company, rawDataSheet){
   v>0&& log('Procedure cleanRawData begin');
-  throw new Error('get here - cleanRawData');
 
   const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
@@ -1192,61 +1191,190 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   v>0&& log('Procedure cleanRawData END');
 } // procedure cleanRawData END
 
+class FieldValidator{
+  constructor(){
+    this._fieldName = new Map();
+    this._fieldIndexe = new Map();
+    this._fieldType = new Map();
+    this._minValue = new Map();
+    this._maxValue = new Map();
+    this._exactValues = new Map();
+    this._validTypes = ['string', 'number', 'boolean', 'Date'];
+  }
+  /**
+   * @param {string} fieldName
+   * @param {number} fieldIndex
+   * @param {string} fieldType
+   * @param {*} [minVal]
+   * @param {*} [maxVal]
+   * @param {Set} [exactValues]
+   */
+  
+  setField(fieldName, fieldIndex, fieldType,
+    minVal=null, maxVal=null, exactValues=new Set()){
+
+    const args = [...arguments];
+    const argRequiredTypes = new Map();
+
+    argRequiredTypes.set('fieldName', 'string');
+    argRequiredTypes.set('fieldIndex', 'number');
+    argRequiredTypes.set('fieldType', 'string');
+    argRequiredTypes.set('minVal', fieldType);
+    argRequiredTypes.set('maxVal', fieldType);
+    argRequiredTypes.set('exactValues', 'Set');
+   
+    const argNames = Array.from(argRequiredTypes.keys()); 
+
+    // key: argName, value: argIndex
+    const argIndexes = argNames.reduce((argIndexes, argName, index) => {
+        argIndexes.set(argName, index);
+        return argIndexes;
+      }, new Map());
+
+/*
+    const argCurrentTypes = args.reduce((argCurrentTypes, arg, index) => {
+      argCurrentTypes.set(argNames[index], typeof arg);
+      return argCurrentTypes;
+      }, new Map());
+*/
+    const argCurrentTypes = argNames.reduce((argCurrentTypes, argName, index) =>{
+      argCurrentTypes.set(argName, typeof args[index])
+      return argCurrentTypes;
+    }, new Map());
+
+    // validate arguments
+    const err = new TypeError('Wrong argument type.\n');
+
+    for (const [argName, argType] of argCurrentTypes){
+      if (argRequiredTypes.get(argName) !== argType){
+        err.argName = argName;
+        err.argIndex = argIndexes.get(argName);
+        err.argRequiredType = argRequiredTypes.get(argName);
+        err.argCurrentType = argType;
+
+        err.message += JSON.stringify(err);
+
+        throw err;
+      }
+    }
+
+    this._fieldName.set(fieldName, fieldIndex);
+    this._fieldIndexe.set(fieldIndex, fieldName);
+    this._fieldType.set(fieldName, fieldType);
+    this._minValue.set(fieldName, minVal);
+    this._maxValue.set(fieldName, maxVal);
+    this._exactValues.set(fieldName, exactValues);
+  }
+}
+
+
 /**
  * @param {Array} record
- * @param {Object} fieldNames
+ * @param {Object} fieldNames - key: {string} fieldName, val: {Number} index
  */
 function validateRecord(record, fieldNames){
+
   const validators = new Map();
+
   validators.set('date',
     date => {
       if (isNaN(date.getTime()))
-        throw new TypeError(`Date ${typeof date} ${date} is not a valid {Date} instance.`);
+        throw new TypeError(
+          `In field ${fieldNames['date']} ${typeof date} ${date} is not valid Date.`);
     });
+
   validators.set('ref',
-    ref => {
+    (ref, fieldName) => {
       const type = typeof ref;
       const val = ref;
-      if (type !== 'string')
-        throw new TypeError(`${type}, val:${val} is not string`); 
+      const expectedType = 'string';
+      const errorInfo = {
+          field_name: fieldName,
+          field_index: fieldNames[fieldName],
+          value_type: type,
+          value: val,
+          expected_type: expectedType,
+          errors: [],
+          fromRef: "fromRef"
+      };
+
+      if (type !== expectedType)
+        errorInfo.errors.push('type_error');
+        //throw new TypeError(JSON.stringify({...errorInfo, )); 
+
+      if (errorInfo.errors.length)
+        throw new Error(JSON.stringify(errorInfo));
     });
+
   validators.set('doc_type',
     doc_type => {
       const type = typeof doc_type;
       const val = doc_type;
-      if (type !== 'string')
-        throw new TypeError(`${type}, val:${val} is not string`); 
+      const expectedType = 'string';
+
+      if (type !== expectedType)
+        throw new TypeError(JSON.stringify({
+          field_name: fieldName,
+          field_index: fieldNames[fieldName],
+          value_type: type,
+          value: val,
+          expected_type: expectedType
+        })); 
     });
   validators.set('descr',
     descr => {
       const type = typeof descr;
       const val = descr;
-      if (type !== 'string')
-        throw new TypeError(`${type}, val:${val} is not string`); 
+      const expectedType= 'string';
+
+      if (type !== expectedType)
+        throw new TypeError(JSON.stringify({
+          field_name: fieldName,
+          field_index: fieldNames[fieldName],
+          value_type: type,
+          value: val,
+          expected_type: expectedType
+        })); 
     });
   validators.set('I_O_type',
     I_O_type => {
       const type = typeof I_O_type;
       const val = I_O_type;
-      if (type !== 'number')
-        throw new TypeError(`${type}, val:${val} is not number`);
+      const expectedType = 'number';
+      if (type !== expectedType)
+        throw new TypeError(JSON.stringify({
+          field_name: fieldName,
+          field_index: fieldNames[fieldName],
+          value_type: type,
+          value: val,
+          expected_type: expectedType
+        })); 
       if (val < 0 || val > 1)
-        throw new TypeError(`${type}, val:${val} is not 1 or 0`); 
+        throw new TypeError(
+          `In field ${fieldNames['I_O_type']} ${type}, val:${val} is not 1 or 0`); 
     });
   validators.set('value',
     value => {
       const type = typeof value;
       const val = value;
-      if (type !== 'number')
-        throw new TypeError(`${type}, val:${val} is not number`);
+      const expectedType = 'number';
+      if (type !== expectedType)
+        throw new TypeError(JSON.stringify({
+          field_name: fieldName,
+          field_index: fieldNames[fieldName],
+          value_type: type,
+          value: val,
+          expected_type: expectedType
+        })); 
     });
 
   // validate record (row)
   for (const fieldName in fieldNames){
     const i = fieldNames[fieldName];
+    const val = record[i];
     if ( ! validators.has(fieldName))
       throw new ReferenceError(`Validator function not set for field ${fieldName}`);
-    validators.get(fieldName)(record[i]);
+    validators.get(fieldName)(val, fieldName);
   }
   
 } // function validateRecord END
@@ -1315,7 +1443,10 @@ library.set('getRecords', getRecords);
 return library.get(required);
 } // function libraryGet END
 
+
 } // main END
 
-
+function teTest(x){
+  return x+10;
+}
 
