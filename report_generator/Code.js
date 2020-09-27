@@ -68,11 +68,11 @@ const rawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SU
 if (procedure==='renderReport'){
   let args;
   try{
-    const dataRecords = getRecords(rawDataSheet);
+    const dataRecords = getRecords(rawDataSheet, v, log);
     const template = defaultTemplate();
     const targetSpreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
 
-    args = [fromDate, toDate, company, dataRecords, template, targetSpreadsheet];
+    args = [fromDate, toDate, company, dataRecords, template, targetSpreadsheet, v, log];
 
   } catch(e){
     throw new Error(
@@ -102,7 +102,7 @@ if (procedure==='importData'){
       sheet => sheet.getName() === company.get('alias')+RAWDATA_SHEET_SUFFIX
       );
 
-    args = [fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo];
+    args = [fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo, v, log];
 
   } catch(e){
     throw new Error(
@@ -187,7 +187,7 @@ function areTheSame(map_1, map_2){
  *      - {string} keys - dates (ISO 8601)
  *      - {Array} values - of {Map} records, like {'date'=>{Date}, 'ref'=>32, etc.} 
  */
-function searchRecords(spreadsheet, identifierPattern, rowLim=50, colLim=6){
+function searchRecords(spreadsheet, identifierPattern, v, log, rowLim=50, colLim=6){
   const records = new Map();
 
   // measurements
@@ -579,7 +579,7 @@ function renderReport(
     company,
     dataRecords,
     template,
-    targetSpreadsheet){
+    targetSpreadsheet, v, log){
   v>0&& log('Procedure renderReport begin');
 
   /**
@@ -1026,7 +1026,7 @@ function importData(
     company,
     dataLinks,
     identifierPattern,
-    sheetToImportTo){
+    sheetToImportTo, v, log){
   v>0&& log('Procedure importData begin');
   v>2&& log(`Company alias: ${company.get('alias')}`);
   const getRecords = libraryGet('getRecords');
@@ -1074,7 +1074,7 @@ function importData(
 
   const foundRecords = new Map(); 
   for (const sheet of srcSpreadsheets){
-    for (const [dateStr, record] of searchRecords(sheet, identifierPattern)){
+    for (const [dateStr, record] of searchRecords(sheet, identifierPattern, v, log)){
       foundRecords.set(dateStr, record);
     }
   }
@@ -1086,7 +1086,7 @@ function importData(
 
   
   // retrieve existing records in raw data sheet
-  const existingRecords = getRecords(sheetToImportTo);
+  const existingRecords = getRecords(sheetToImportTo, v, log);
   v>2&& log(`${existingRecords.size} day-records exists in ${sheetToImportTo.getName()}`);
 
   const dates = datesBetween(fromDate, toDate);
@@ -1422,7 +1422,7 @@ function getFieldNames(firstRow){
   return fieldNames;
 }
 
-function getRecords(rawDataSheet){
+function getRecords(rawDataSheet, v, log){
   const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
 
