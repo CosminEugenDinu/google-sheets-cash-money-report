@@ -128,6 +128,7 @@ if (procedure === 'cleanRawData'){
   }
 }
 
+} // main END
 //---------------------------------------------------------------------------------
 
 
@@ -484,7 +485,6 @@ function defaultTemplate(){
   return TEMPLATE;
 }
 
-} // main END
 
 
 
@@ -1200,25 +1200,27 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
 
 class FieldValidator{
   constructor(){
+    this._fields = new Map();
+
     this._fieldName = new Map();
-    this._fieldIndexe = new Map();
+    this._fieldIndex = new Map();
     this._fieldType = new Map();
     this._minValue = new Map();
     this._maxValue = new Map();
     this._exactValues = new Map();
     this._validTypes = ['string', 'number', 'boolean', 'Date'];
+
   }
   /**
    * @param {string} fieldName
    * @param {number} fieldIndex
    * @param {string} fieldType
-   * @param {*} [minVal]
-   * @param {*} [maxVal]
+   * @param {*} [minValue]
+   * @param {*} [maxValue]
    * @param {Set} [exactValues]
    */
-  
   setField(fieldName, fieldIndex, fieldType,
-    minVal=null, maxVal=null, exactValues=new Set()){
+    minValue=null, maxValue=null, exactValues=new Set()){
 
     const args = [...arguments];
     const argRequiredTypes = new Map();
@@ -1226,8 +1228,8 @@ class FieldValidator{
     argRequiredTypes.set('fieldName', 'string');
     argRequiredTypes.set('fieldIndex', 'number');
     argRequiredTypes.set('fieldType', 'string');
-    argRequiredTypes.set('minVal', fieldType);
-    argRequiredTypes.set('maxVal', fieldType);
+    argRequiredTypes.set('minValue', fieldType);
+    argRequiredTypes.set('maxValue', fieldType);
     argRequiredTypes.set('exactValues', 'Set');
    
     const argNames = Array.from(argRequiredTypes.keys()); 
@@ -1238,22 +1240,17 @@ class FieldValidator{
         return argIndexes;
       }, new Map());
 
-/*
-    const argCurrentTypes = args.reduce((argCurrentTypes, arg, index) => {
-      argCurrentTypes.set(argNames[index], typeof arg);
-      return argCurrentTypes;
-      }, new Map());
-*/
     const argCurrentTypes = argNames.reduce((argCurrentTypes, argName, index) =>{
-      argCurrentTypes.set(argName, typeof args[index])
+      const arg = args[index];
+      const argType = typeof arg === 'object' ? arg.constructor.name : typeof arg; 
+      argCurrentTypes.set(argName, argType)
       return argCurrentTypes;
     }, new Map());
 
     // validate arguments
-    const err = new TypeError('Wrong argument type.\n');
-
     for (const [argName, argType] of argCurrentTypes){
       if (argRequiredTypes.get(argName) !== argType){
+        const err = new TypeError('Wrong argument type.\n');
         err.argName = argName;
         err.argIndex = argIndexes.get(argName);
         err.argRequiredType = argRequiredTypes.get(argName);
@@ -1264,13 +1261,35 @@ class FieldValidator{
         throw err;
       }
     }
-
+/*
     this._fieldName.set(fieldName, fieldIndex);
-    this._fieldIndexe.set(fieldIndex, fieldName);
+    this._fieldIndex.set(fieldIndex, fieldName);
     this._fieldType.set(fieldName, fieldType);
-    this._minValue.set(fieldName, minVal);
-    this._maxValue.set(fieldName, maxVal);
+    this._minValue.set(fieldName, minValue);
+    this._maxValue.set(fieldName, maxValue);
     this._exactValues.set(fieldName, exactValues);
+*/
+    const field = new Map();
+    field.set('index', fieldIndex);
+    this._fields.set(fieldName, field); 
+
+  }
+
+  getField(fieldName){
+    const fields = this._fields;
+    return {
+      get name(){
+        return fieldName;
+      },
+      set name(val){
+        const err = new Error(`field.name is read only`);
+        err.reason = 'readonly';
+        throw err;
+      },
+      get index(){
+        return fields.get(fieldName).get('index'); 
+      }
+    }
   }
 }
 
@@ -1449,6 +1468,7 @@ library.set('cleanRawData', cleanRawData);
 library.set('validateRecord', validateRecord);
 library.set('getFieldNames', getFieldNames);
 library.set('getRecords', getRecords);
+library.set('FieldValidator', FieldValidator);
 library.set('dummy_func', dummy_func);
 
 // returns required function or class
