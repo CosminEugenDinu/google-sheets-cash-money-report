@@ -484,6 +484,13 @@ function defaultTemplate(){
   return TEMPLATE;
 }
 
+} // main END
+
+
+
+
+
+
 function libraryGet(required){
 
 // library members dictionary
@@ -1431,6 +1438,10 @@ function getRecords(rawDataSheet){
   return records;
 } // function getRecords END
 
+function dummy_func(ceva){
+  return ceva + 10;
+}
+
 library.set('settings', Settings);
 library.set('renderReport', renderReport);
 library.set('importData', importData);
@@ -1438,15 +1449,8 @@ library.set('cleanRawData', cleanRawData);
 library.set('validateRecord', validateRecord);
 library.set('getFieldNames', getFieldNames);
 library.set('getRecords', getRecords);
+library.set('dummy_func', dummy_func);
 
 // returns required function or class
 return library.get(required);
 } // function libraryGet END
-
-
-} // main END
-
-function teTest(x){
-  return x+10;
-}
-
