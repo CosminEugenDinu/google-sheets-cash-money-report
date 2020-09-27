@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 
 const assert = require('assert');
 const toTest = require('./Code.js');
@@ -9,4 +10,4 @@ function test_run(){
   
 }
 
-test_run();
+test_run()
