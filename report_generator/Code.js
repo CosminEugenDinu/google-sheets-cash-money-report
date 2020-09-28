@@ -1216,10 +1216,17 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
  */
 function argumentsValidator(){
   const _argTypes = [];
-  let argValid = false;
-  const setArgTypes = (...argTypes) => [..._argTypes[0]] = argTypes;  
+  let _argValid = false;
+  const setArgTypes = (...argTypes)=>argTypes.forEach(
+    t =>{
+      if (typeof t !== 'string')
+        throw new TypeError(`Type descriptor ${typeof t} is not valid`);
+      _argTypes.push(t);
+      }
+  );
   const validateArgTypes = (...currArgs) => {
-
+    
+    const err = new TypeError('Invalid Signature');
   }; 
 
 } // argumentsValidator END
