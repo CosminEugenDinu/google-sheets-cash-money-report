@@ -4,7 +4,6 @@
  * This function is considered global
  */
 
-
 function main () {
 
 const Settings = libraryGet('settings');
