@@ -58,15 +58,19 @@ tests.set('FieldValidator', () => {
     10, // maxValue
     [9, 10, 12].reduce((set,exactVal)=>{set.add(exactVal); return set;}, new Set())
   ];
-
+  
   // test for valid arguments
   assert.doesNotThrow(()=>{
+    validator.setField(...validArgs.slice(0,5));
+    validator.setField(...validArgs.slice(0,4));
+    validator.setField(...validArgs.slice(0,3));
     validator.setField(...validArgs);
   });
   // test for wrong num of arguments
   assert.throws(()=>{
-    validator.setField(...validArgs.slice(0,-1));
-  },{name:'TypeError'});
+    validator.setField(...validArgs.slice(0,2));
+    validator.setField(...validArgs, 'another one');
+  },{name:'TypeError'}, 'should throw if wrong num of arguments');
   // test for wrong type argument
   assert.throws(()=>{
     const oneWrongType = [...validArgs];
@@ -75,13 +79,15 @@ tests.set('FieldValidator', () => {
   },{name:'TypeError', expectedType: 'number'});
 
   const field = validator.getFieldByName(validArgs[0]);
-
   // field object expected properties
   ['name', 'index', 'type', 'minValue', 'maxValue', 'exactValues']
     .forEach((prop, i) => {
       assert.strictEqual(field.has(prop), true, `property-key ${prop} not found`);
       assert.strictEqual(field.get(prop), validArgs[i]);
   });
+  // test for field instance properties values
+
+
 });
 
 tests.set('Log', () => {
