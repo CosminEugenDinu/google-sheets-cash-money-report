@@ -9,9 +9,15 @@ const libraryGet = Code.__get__('libraryGet');
 
 const tests = new Map();
 
+const argumentsValidator = 'argumentsValidator',
+  FieldValidator = 'FieldValidator',
+  Log = 'Log';
 
-tests.set('FieldValidator', () => {
-  const FieldValidator = libraryGet('FieldValidator');
+tests.set(argumentsValidator, null);
+
+
+tests.set(FieldValidator, () => {
+  const FieldValidator = libraryGet(FieldValidator);
   const validator = new FieldValidator();
   const validArgs = [
     'nums', // fieldName
@@ -72,13 +78,7 @@ tests.set('Log', () => {
   assert.equal(cellValue[0], '> important');
 });
 
-tests.set('dummy_func',() => {
-  const libScopeVar = 'lsv';
-  const dummy_func = libraryGet('dummy_func');
-  assert.equal(dummy_func('arg'), 'arg_lsv', 'dummy_func failed');
-});
 
-//tests.get('dummy_func')();
-tests.get('FieldValidator')();
-tests.get('Log')();
+tests.get(FieldValidator)();
+tests.get(Log)();
 
