@@ -1226,7 +1226,7 @@ function argumentsValidator(){
       }
   );
   
-  const validateArgTypes = (...currArgs) => {
+  const validateArgs = (...currArgs) => {
     if (currArgs.length !== _argTypes.length){
       throw new TypeError('Wrong number of arguments');
     }
@@ -1236,13 +1236,13 @@ function argumentsValidator(){
         currArg.constructor.name : typeof currArg; 
       if (currArgType !== type){
         const err = new TypeError('Invalid Signature');
-        err.exp = _argTypes[i];
+        err.expectedType = _argTypes[i];
         throw err;
       }
     });
   }; 
   // returns setter and validator closure functions
-  return [setArgTypes, validateArgTypes];
+  return [setArgTypes, validateArgs];
 
 } // argumentsValidator END
 
@@ -1262,46 +1262,9 @@ class FieldValidator{
    */
   setField(fieldName, fieldIndex, fieldType,
     minValue=null, maxValue=null, exactValues=new Set()){
-
-    const args = [...arguments];
-    const argRequiredTypes = new Map();
-
-    argRequiredTypes.set('fieldName', 'string');
-    argRequiredTypes.set('fieldIndex', 'number');
-    argRequiredTypes.set('fieldType', 'string');
-    argRequiredTypes.set('minValue', fieldType);
-    argRequiredTypes.set('maxValue', fieldType);
-    argRequiredTypes.set('exactValues', 'Set');
-   
-    const argNames = Array.from(argRequiredTypes.keys()); 
-
-    // key: argName, value: argIndex
-    const argIndexes = argNames.reduce((argIndexes, argName, index) => {
-        argIndexes.set(argName, index);
-        return argIndexes;
-      }, new Map());
-
-    const argCurrentTypes = argNames.reduce((argCurrentTypes, argName, index) =>{
-      const arg = args[index];
-      const argType = typeof arg === 'object' ? arg.constructor.name : typeof arg; 
-      argCurrentTypes.set(argName, argType)
-      return argCurrentTypes;
-    }, new Map());
-
-    // validate arguments
-    for (const [argName, argType] of argCurrentTypes){
-      if (argRequiredTypes.get(argName) !== argType){
-        const err = new TypeError('Wrong argument type.\n');
-        err.argName = argName;
-        err.argIndex = argIndexes.get(argName);
-        err.argRequiredType = argRequiredTypes.get(argName);
-        err.argCurrentType = argType;
-
-        err.message += JSON.stringify(err);
-
-        throw err;
-      }
-    }
+    const [setArgTypes, validateArgs] = libraryGet('argumentsValidator')();
+    setArgTypes('string','number','string',fieldType,fieldType,'Set');
+    validateArgs(...arguments);
 
     const field = new Map();
     field.set('name', fieldName);
