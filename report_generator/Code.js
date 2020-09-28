@@ -1263,7 +1263,30 @@ class FieldValidator{
   setField(fieldName, fieldIndex, fieldType,
     minValue=null, maxValue=null, exactValues=new Set()){
     const [setArgTypes, validateArgs] = libraryGet('argumentsValidator')();
-    setArgTypes('string','number','string',fieldType,fieldType,'Set');
+
+    // number of actual parameters
+    // last undefined actual parameters are excluded
+    const paramLength = arguments.length;
+    let lastArgIndex = paramLength;
+    while (--lastArgIndex > 0){
+      if (arguments[lastArgIndex] !== undefined) break;
+    }
+    const argsLength = lastArgIndex + 1;
+
+    if (argsLength < 3)
+      throw new TypeError('Invalid number of arguments');
+
+    if (argsLength === 3)
+      setArgTypes('string','number','string');
+    else if (argsLength === 4)
+      setArgTypes('string','number','string', fieldType);
+    else if (argsLength === 5)
+      setArgTypes('string','number','string', fieldType, fieldType);
+    else if (argsLength === 6)
+      setArgTypes('string','number','string', fieldType, fieldType, 'Set');
+
+
+    //setArgTypes('string','number','string',fieldType,fieldType,'Set');
     validateArgs(...arguments);
 
     const field = new Map();
@@ -1278,8 +1301,24 @@ class FieldValidator{
     this._fieldIndexes.set(fieldIndex, field);
 
   }
-
+  
+  /**
+   * @param {string} fieldName
+   * @param {*} testValue
+   */
   validate(fieldName, testValue){
+    const field = this._fields.get(fieldName);
+    const valType = typeof testValue==='object'?testValue.constructor.name:typeof testValue;
+    // test for type
+    if (field.get('type') !== valType){
+      const err = new TypeError('Invalid Value Type');
+      err.fieldName = fieldName;
+      err.expectedType = field.get('type');
+      err.currentType = valType;
+      throw err;
+    }
+    // test for value
+    
     return true;
   }
   getFieldByName(fieldName){
