@@ -1212,6 +1212,19 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
 
 } // procedure cleanRawData END
 
+/**
+ * Arguments validator
+ */
+function argumentsValidator(){
+  const _argTypes = [];
+  let argValid = false;
+  const setArgTypes = (...argTypes) => [..._argTypes[0]] = argTypes;  
+  const validateArgTypes = (...currArgs) => {
+
+  }; 
+
+} // argumentsValidator END
+
 class FieldValidator{
   constructor(){
     this._fieldNames = new Map();
