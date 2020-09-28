@@ -17,29 +17,33 @@ tests.set('argumentsValidator', () => {
     {name:'TypeError'}, "setArgTypes can be called only with strings");
 
   function InvalidType(){};
-  const someValidTypes = ['str',1,true,{},[],new Map(),new Set(),new Date()];
+  const someValidArgs = ['str',1,true,{},[],new Map(),new Set(),new Date()];
 
   // proper definition of function using argumentsValidator
-  function properDef(s,n,b,O,A,M,S,D){
+  function funcDef(s,n,b,O,A,M,S,D){
     const [setArgTypes, validateArgs] = argumentsValidator();
     setArgTypes('string','number','boolean','Object','Array','Map','Set','Date');
     validateArgs(...[...arguments]);
-    
     const body = "rest of the body of the function definition";
   }
-  
-  // wrong definition of function using argumentsValidator
-  // number of formal parameters not the same as num of arguments of setArgTypes
-  function wrongDef1(s,n,b,O,A,M,S) 
-
-
-  assert.doesNotThrow(()=>{
-    properDef();});
+  // test for normal valid arguments
+  assert.doesNotThrow(()=>{funcDef(...someValidArgs);});
+  // test for wrong number of arguments
   assert.throws(()=>{
+    const fewerArgs = someValidArgs.slice(0, -1);
+    const moreArgs = [...someValidArgs,new Date()];
+    funcDef(...fewerArgs);
+    funcDef(...moreArgs);
     },{name:'TypeError',});
-  assert.throws(()=>{
-    properDef(1,2,true);
-  },{name:'TypeError',});
+  // test for wrong type of one argument
+  someValidArgs.map((arg, i) =>{
+    const currArgType = typeof arg==='object'?arg.constructor.name:typeof arg;
+    const oneInvalidType = [...someValidArgs];
+    oneInvalidType[i] = new InvalidType();
+      assert.throws(()=>{
+        funcDef(...oneInvalidType);
+        },{name:'TypeError', exp: currArgType});
+    });
 
 });
 
