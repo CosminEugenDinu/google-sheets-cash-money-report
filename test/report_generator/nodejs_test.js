@@ -9,15 +9,10 @@ const libraryGet = Code.__get__('libraryGet');
 
 const tests = new Map();
 
-const argumentsValidator = 'argumentsValidator',
-  FieldValidator = 'FieldValidator',
-  Log = 'Log';
+tests.set('argumentsValidator', null);
 
-tests.set(argumentsValidator, null);
-
-
-tests.set(FieldValidator, () => {
-  const FieldValidator = libraryGet(FieldValidator);
+tests.set('FieldValidator', () => {
+  const FieldValidator = libraryGet('FieldValidator');
   const validator = new FieldValidator();
   const validArgs = [
     'nums', // fieldName
@@ -79,6 +74,6 @@ tests.set('Log', () => {
 });
 
 
-tests.get(FieldValidator)();
-tests.get(Log)();
+tests.get('FieldValidator')();
+tests.get('Log')();
 
