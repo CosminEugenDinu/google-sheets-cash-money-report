@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+node nodejs_test.js
+
+
