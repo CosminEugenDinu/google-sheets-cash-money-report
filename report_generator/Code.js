@@ -1215,20 +1215,33 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
  * Arguments validator
  */
 function argumentsValidator(){
+  // variable enclosed by setArgTypes function
   const _argTypes = [];
-  let _argValid = false;
+
   const setArgTypes = (...argTypes)=>argTypes.forEach(
-    t =>{
-      if (typeof t !== 'string')
-        throw new TypeError(`Type descriptor ${typeof t} is not valid`);
-      _argTypes.push(t);
+    type =>{
+      if (typeof type !== 'string')
+        throw new TypeError(`Type descriptor ${typeof type} is not valid`);
+      _argTypes.push(type);
       }
   );
+  
   const validateArgTypes = (...currArgs) => {
-    
-    const err = new TypeError('Invalid Signature');
+    if (currArgs.length !== _argTypes.length){
+      throw new TypeError('Wrong number of arguments');
+    }
+    _argTypes.forEach((type, i) =>{
+      const currArg = currArgs[i];
+      const currArgType = typeof currArg === 'object' ?
+        currArg.constructor.name : typeof currArg; 
+      if (currArgType !== type){
+        const err = new TypeError('Invalid Signature');
+        err.exp = _argTypes[i];
+        throw err;
+      }
+    });
   }; 
-
+  // returns setter and validator closure functions
   return [setArgTypes, validateArgTypes];
 
 } // argumentsValidator END
