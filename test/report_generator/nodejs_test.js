@@ -42,7 +42,7 @@ tests.set('argumentsValidator', () => {
     oneInvalidType[i] = new InvalidType();
       assert.throws(()=>{
         funcDef(...oneInvalidType);
-        },{name:'TypeError', exp: currArgType});
+        },{name:'TypeError', expectedType: currArgType});
     });
 
 });
@@ -59,7 +59,20 @@ tests.set('FieldValidator', () => {
     [9, 10, 12].reduce((set,exactVal)=>{set.add(exactVal); return set;}, new Set())
   ];
 
-  validator.setField(...validArgs);
+  // test for valid arguments
+  assert.doesNotThrow(()=>{
+    validator.setField(...validArgs);
+  });
+  // test for wrong num of arguments
+  assert.throws(()=>{
+    validator.setField(...validArgs.slice(0,-1));
+  },{name:'TypeError'});
+  // test for wrong type argument
+  assert.throws(()=>{
+    const oneWrongType = [...validArgs];
+    oneWrongType[3] = 'str'; // correct would be 1
+    validator.setField(...oneWrongType);
+  },{name:'TypeError', expectedType: 'number'});
 
   const field = validator.getFieldByName(validArgs[0]);
 
