@@ -1229,6 +1229,8 @@ function argumentsValidator(){
     const err = new TypeError('Invalid Signature');
   }; 
 
+  return [setArgTypes, validateArgTypes];
+
 } // argumentsValidator END
 
 class FieldValidator{
@@ -1490,6 +1492,7 @@ library.set('getFieldNames', getFieldNames);
 library.set('getRecords', getRecords);
 library.set('FieldValidator', FieldValidator);
 library.set('Log', Log);
+library.set('argumentsValidator', argumentsValidator);
 library.set('dummy_func', dummy_func);
 
 // returns required function or class
