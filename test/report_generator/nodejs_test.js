@@ -9,7 +9,39 @@ const libraryGet = Code.__get__('libraryGet');
 
 const tests = new Map();
 
-tests.set('argumentsValidator', null);
+tests.set('argumentsValidator', () => {
+  const argumentsValidator = libraryGet('argumentsValidator');
+  const [setArgTypes, validateArgs] = argumentsValidator();
+
+  assert.throws(()=>{setArgTypes(1,'string')},
+    {name:'TypeError'}, "setArgTypes can be called only with strings");
+
+  function InvalidType(){};
+  const someValidTypes = ['str',1,true,{},[],new Map(),new Set(),new Date()];
+
+  // proper definition of function using argumentsValidator
+  function properDef(s,n,b,O,A,M,S,D){
+    const [setArgTypes, validateArgs] = argumentsValidator();
+    setArgTypes('string','number','boolean','Object','Array','Map','Set','Date');
+    validateArgs(...[...arguments]);
+    
+    const body = "rest of the body of the function definition";
+  }
+  
+  // wrong definition of function using argumentsValidator
+  // number of formal parameters not the same as num of arguments of setArgTypes
+  function wrongDef1(s,n,b,O,A,M,S) 
+
+
+  assert.doesNotThrow(()=>{
+    properDef();});
+  assert.throws(()=>{
+    },{name:'TypeError',});
+  assert.throws(()=>{
+    properDef(1,2,true);
+  },{name:'TypeError',});
+
+});
 
 tests.set('FieldValidator', () => {
   const FieldValidator = libraryGet('FieldValidator');
@@ -76,4 +108,5 @@ tests.set('Log', () => {
 
 tests.get('FieldValidator')();
 tests.get('Log')();
+tests.get('argumentsValidator')();
 
