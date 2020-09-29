@@ -10,8 +10,10 @@ const libraryGet = Code.__get__('libraryGet');
 const FieldValidator = libraryGet('FieldValidator');
 const Log = libraryGet('Log');
 const getType = libraryGet('getType');
+const convertType = libraryGet('convertType');
 const argumentsValidator = libraryGet('argumentsValidator');
 const validateRecord = libraryGet('validateRecord');
+const cleanRawData = libraryGet('cleanRawData');
 
 const tests = new Map();
 
@@ -58,6 +60,7 @@ tests.set('getType', () => {
   const _boolean = true;
   const _null = null;
   const _undefined = undefined;
+  const _NaN = NaN;
   // structural types
   const _function = function(){};
   const _array = [];
@@ -69,11 +72,16 @@ tests.set('getType', () => {
   assert.strictEqual(getType(_boolean), 'boolean');
   assert.strictEqual(getType(_null), 'null');
   assert.strictEqual(getType(_undefined), 'undefined');
+  assert.strictEqual(getType(_NaN), 'nan');
   assert.strictEqual(getType(_function), 'Function');
   assert.strictEqual(getType(_array), 'Array');
   assert.strictEqual(getType(_object), 'Object');
   assert.strictEqual(getType(_map), 'Map');
   assert.strictEqual(getType(_set), 'Set');
+});
+
+tests.set('convertType', () => {
+  convertType();
 });
 
 tests.set('argumentsValidator', () => {
@@ -271,14 +279,97 @@ tests.set('FieldValidator', () => {
 });
 
 tests.set('validateRecord', () => {
+  const record = [1,2,3,4,5,6,7];
+  const fields = {date:0,name:1};
+});
+
+tests.set('cleanRawData', () => {
+  for (const [correctable_case, correct_case] of [
+    [
+    // correct record
+    [new Date(2015,1,20), 'ref0', 'docType0', 'descr0', 0, 20],
+    [new Date(2015,1,20), 'ref0', 'docType0', 'descr0', 0, 20]
+    ],
+    [
+    // wrong ref type
+    [new Date(2015,1,21), 21, 'docType1', 'docDesrc1', 1, 21],
+    [new Date(2015,1,21), '21', 'docType1', 'docDesrc1', 1, 21],
+    ],
+    [
+    // wrong doc_type type
+    [new Date(2015,1,22),'ref2', 222, 'docDescr2', 0, 22],
+    [new Date(2015,1,22),'ref2', '222', 'docDescr2', 0, 22],
+    ],
+    [
+    // wrong descr type
+    [new Date(2015,1,23),'ref3', 'docType3', 333, 0, 23],
+    [new Date(2015,1,23),'ref3', 'docType3', '333', 0, 23],
+    ],
+    [
+    // wrong I_O_type type
+    [new Date(2015,1,24), 'ref4', 'docType4', 'descr4', '0', 24],
+    [new Date(2015,1,24), 'ref4', 'docType4', 'descr4', 0, 24],
+    ],
+    [
+    // wrong value type
+    [new Date(2015,1,25), 'ref5', 'docType5', 'descr5', 0, '555'],
+    [new Date(2015,1,25), 'ref5', 'docType5', 'descr5', 0, 555],
+    ],
+    [
+    // wrong date type
+    ['2015,1,26', 'ref6', 'docType6', 'descr6', 0, 26],
+    [new Date(2015,1,26), 'ref6', 'docType6', 'descr6', 0, 26],
+    ],
+  ]){
+    // mocks
+    const fromDate = new Date(), toDate = new Date();
+    const company = new Map();
+    const values = [
+      ['date','ref','doc_type','descr','I_O_type','value'],
+      [...correctable_case],
+    ];
+    const Range = {getValues(){return values;}};
+    const rawDataSheet = {getRange(str){return Range;}};
+
+    cleanRawData(fromDate, toDate, company, rawDataSheet);
+
+    // now values should be cleaned
+    //assert.deepStrictEqual(values[1], correct_case);
+  }
+
+  const throwing_cases = [
+    // wrong I_O_type value
+    [new Date(2015,1,27), 'ref7', 'docType7', 'descr7', 3, 26],
+    // wrong I_O_type value and type
+    [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', '8', 26],
+    // wrong date value ant type
+    ['xx,yy,zz', 'ref9', 'docType9', 'descr9', 1, 26],
+    // wrong value type and value
+    [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', '8', 'xx'],
+  ];
+  const duplicates_removable_cases = [
+    [
+    [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', 0, 26],
+    [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', 0, 26],
+    [new Date(2015,1,28), 'ref8', 'docType8', 'descr7', 0, 26],
+    [new Date(2015,1,27), 'ref8', 'docType8', 'descr8', 0, 26],
+    ],
+    [
+    [new Date(2015,1,27), 'ref8', 'docType8', 'descr8', 0, 26],
+    [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', 0, 26],
+    [new Date(2015,1,28), 'ref8', 'docType8', 'descr7', 0, 26],
+    ]
+  ];
+  return
 
 });
 
 
-
 tests.get('Log')();
 tests.get('getType')();
+tests.get('convertType')();
 tests.get('argumentsValidator')();
 tests.get('FieldValidator')();
 tests.get('validateRecord')();
+tests.get('cleanRawData')();
 
