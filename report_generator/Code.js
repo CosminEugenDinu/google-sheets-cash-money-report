@@ -1215,6 +1215,7 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
  * Arguments validator
  */
 function argumentsValidator(){
+  const getType = libraryGet('getType');
   // variable enclosed by setArgTypes function
   const _argTypes = [];
 
@@ -1232,9 +1233,7 @@ function argumentsValidator(){
     }
     _argTypes.forEach((type, i) =>{
       const currArg = currArgs[i];
-      const currArgType = typeof currArg === 'object' ?
-        currArg.constructor.name : typeof currArg; 
-      if (currArgType !== type){
+      if (getType(currArg) !== type){
         const err = new TypeError('Invalid Signature');
         err.expectedType = _argTypes[i];
         throw err;
@@ -1245,6 +1244,26 @@ function argumentsValidator(){
   return [setArgTypes, validateArgs];
 
 } // argumentsValidator END
+
+/**
+ * @param {*} obj
+ * @returns {string}
+ */
+function getType(obj){
+  if (obj === null)
+    return 'null';
+  if (obj === undefined)
+    return 'undefined';
+  if (typeof obj === 'object')
+    // returns 'Object', 'Array', 'Map', 'Set', etc
+    return obj.constructor.name;
+  if (typeof obj === 'function')
+    // returns 'Function'
+    return obj.constructor.name;
+  // returns 'number', 'string', 'boolean'
+  return typeof obj;
+}
+
 
 class FieldValidator{
   constructor(){
@@ -1260,8 +1279,9 @@ class FieldValidator{
    * @param {*} [maxValue]
    * @param {Set} [exactValues]
    */
-  setField(fieldName, fieldIndex, fieldType,
-    minValue=null, maxValue=null, exactValues=new Set()){
+  setField(fieldName, fieldIndex, fieldType, minValue, maxValue, exactValues){
+    
+    const getType = libraryGet('getType');
     const [setArgTypes, validateArgs] = libraryGet('argumentsValidator')();
 
     // number of actual parameters
@@ -1278,28 +1298,52 @@ class FieldValidator{
 
     if (argsLength === 3)
       setArgTypes('string','number','string');
-    else if (argsLength === 4)
-      setArgTypes('string','number','string', fieldType);
-    else if (argsLength === 5)
-      setArgTypes('string','number','string', fieldType, fieldType);
-    else if (argsLength === 6)
-      setArgTypes('string','number','string', fieldType, fieldType, 'Set');
+    else if (argsLength === 4){
+      const minValueType = getType(minValue)==='null'?'null':fieldType;
+      setArgTypes('string','number','string', minValueType);
+    } else if (argsLength === 5){
+      const minValueType = getType(minValue)==='null'?'null':fieldType;
+      const maxValueType = getType(maxValue)==='null'?'null':fieldType;
+      setArgTypes('string','number','string', minValueType, maxValueType);
+    } else if (argsLength === 6)
+      setArgTypes('string','number','string', 'null', 'null', 'Set');
 
 
     //setArgTypes('string','number','string',fieldType,fieldType,'Set');
     validateArgs(...arguments);
 
     const field = new Map();
+    if (this._fieldNames.has(fieldName))
+      throw new Error('fieldName already exists');
+    if (this._fieldIndexes.has(fieldIndex))
+      throw new Error('fieldIndex already exists'); 
     field.set('name', fieldName);
     field.set('index', fieldIndex);
     field.set('type', fieldType);
-    field.set('minValue', minValue);
-    field.set('maxValue', maxValue);
-    field.set('exactValues', exactValues);
+
+    if (minValue !== null && minValue !== undefined && exactValues === undefined)
+      field.set('minValue', minValue);
+    // set max value only if exactValues are not proviced
+    if (maxValue !== null && maxValue !== undefined && exactValues === undefined)
+      field.set('maxValue', maxValue);
+    // throw if type of exactValues is not the same as fieldType
+    if (exactValues !== undefined){
+      for (const exactVal of exactValues.keys()){
+        if (getType(exactVal) !== fieldType){
+          const err = new TypeError('Invalid field exactType');
+          err.fieldName = fieldName;
+          err.expectedType = fieldType;
+          err.currentType = getType(exactVal);
+          throw err;
+        }
+      }
+      field.set('exactValues', exactValues);
+    }
 
     this._fieldNames.set(fieldName, field); 
+    // cannot be tow fields with same index;
     this._fieldIndexes.set(fieldIndex, field);
-
+    return this;
   }
   
   /**
@@ -1307,8 +1351,27 @@ class FieldValidator{
    * @param {*} testValue
    */
   validate(fieldName, testValue){
-    const field = this._fields.get(fieldName);
-    const valType = typeof testValue==='object'?testValue.constructor.name:typeof testValue;
+    const [setArgTypes, validateArgs] = libraryGet('argumentsValidator')();
+    const getType = libraryGet('getType');
+    // validate arguments
+    setArgTypes('string', getType(testValue));
+    validateArgs(...arguments);
+
+    class ValueError extends Error{
+      constructor(msg){
+        super(msg);
+        this.name = 'ValueError';}}
+    class NotFoundError extends Error{
+      constructor(msg){
+        super(msg);
+        this.name = 'NotFoundError';}}
+
+    if ( ! this._fieldNames.has(fieldName))
+      throw new NotFoundError('Field not found');
+
+    const field = this._fieldNames.get(fieldName);
+
+    const valType = getType(testValue); 
     // test for type
     if (field.get('type') !== valType){
       const err = new TypeError('Invalid Value Type');
@@ -1317,7 +1380,34 @@ class FieldValidator{
       err.currentType = valType;
       throw err;
     }
+
     // test for value
+    if (field.has('minValue')){
+      if (testValue < field.get('minValue')){
+        const err = new ValueError('Value less than minValue');
+        err.fieldName = fieldName;
+        err.expectedValue = `>= ${field.get('minValue')}`;
+        err.currentValue = testValue;
+        throw err;
+      }
+    }
+    if (field.has('maxValue')){
+      if (testValue > field.get('maxValue')){
+        const err = new ValueError('Value greater than maxValue');
+        err.fieldName = fieldName;
+        err.expectedValue = `<= ${field.get('maxValue')}`;
+        err.currentValue = testValue;
+        throw err;
+      }
+    }
+    if (field.has('exactValues')){
+      if ( ! field.get('exactValues').has(testValue)){
+        const err = new ValueError('Value not found in exactValues Set');
+        err.fieldName = fieldName;
+        err.currentValue = testValue;
+        throw err;
+      }
+    }
     
     return true;
   }
@@ -1508,8 +1598,11 @@ library.set('getRecords', getRecords);
 library.set('FieldValidator', FieldValidator);
 library.set('Log', Log);
 library.set('argumentsValidator', argumentsValidator);
+library.set('getType', getType);
 library.set('dummy_func', dummy_func);
 
 // returns required function or class
 return library.get(required);
 } // function libraryGet END
+
+
