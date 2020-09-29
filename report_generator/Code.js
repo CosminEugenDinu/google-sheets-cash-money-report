@@ -1146,11 +1146,16 @@ function importData(
   v(0)&& log('Procedure importData END');
 } // importData END
 
-
+/**
+ * @param {Date} fromDate
+ * @param {Date} toDate
+ * @param {Map} company - dict with company info keys like 'name', 'alias', etc
+ * @param {Sheet} rawDataSheet
+ */
 function cleanRawData(fromDate, toDate, company, rawDataSheet){
   const messages = new Map();
 
-  const validate = libraryGet('validateRecord');
+  //const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
 
   const inspectRange = rawDataSheet.getRange('A1:Z');
