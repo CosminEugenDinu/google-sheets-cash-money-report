@@ -7,13 +7,14 @@ const Code = rewire('../../report_generator/Code.js');
 
 const libraryGet = Code.__get__('libraryGet');
 
-// usefull
 const getType = libraryGet('getType');
+const argumentsValidator = libraryGet('argumentsValidator');
+const FieldValidator = libraryGet('FieldValidator');
+const Log = libraryGet('Log');
 
 const tests = new Map();
 
 tests.set('getType', () => {
-  const getType = libraryGet('getType');
 
   // primitive types
   const _number = 1;
@@ -40,7 +41,6 @@ tests.set('getType', () => {
 });
 
 tests.set('argumentsValidator', () => {
-  const argumentsValidator = libraryGet('argumentsValidator');
   const [setArgTypes, validateArgs] = argumentsValidator();
 
   assert.throws(()=>{setArgTypes(1,'string')},
@@ -74,11 +74,9 @@ tests.set('argumentsValidator', () => {
         funcDef(...oneInvalidType);
         },{name:'TypeError', expectedType: currArgType});
     });
-
 });
 
 tests.set('FieldValidator', () => {
-  const FieldValidator = libraryGet('FieldValidator');
 
   const exactIntValues = new Set();
   const exactStrValues = new Set();
@@ -243,8 +241,6 @@ tests.set('Log', () => {
   const cell = {setValue(msg){cellValue[0] = msg;}, setBackground(c){}, setFontColor(c){}, setVerticalAlignment(a){}};
   const range = {clear(){return this;}, merge(){return this;}, getCell(x,y){return cell;},};
   const sheet = {getRange(x,y,z,w){return range;}};
-  
-  const Log = libraryGet('Log');
 
   let cellPos = [1,1], defaultVerbosity = 3;
   let [v, log] = Log(sheet, cellPos, defaultVerbosity);
