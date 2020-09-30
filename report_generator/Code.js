@@ -125,11 +125,14 @@ if (procedure === 'cleanRawData'){
   const messages = [];
 
   try{
-    messages[0] = libraryGet(procedure)(...args);
+    const cleanRawData = libraryGet(procedure);
+    cleanRawData.verbosity = verbosity;
+    cleanRawData(...args);
+    for (const [mes, count] of cleanRawData.messages)
+      log(count, mes);
   } catch(e){
-    throw new Error(`Procedure ${procedure} failed with:\n${e.message}`);
+    throw new Error(`Procedure ${procedure} failed with:\n${e.message}\n${JSON.stringify(e)}`);
   }
-  v(2) && log(...messages[0]);
   v(0)&& log('Procedure cleanRawData END');
 }
 
@@ -1157,6 +1160,10 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   const getFieldNames = libraryGet('getFieldNames');
   const FieldValidator = libraryGet('FieldValidator');
   const getType = libraryGet('getType');
+  
+  // retrieve from spreadsheet
+  const dataRange = rawDataSheet.getRange('A1:Z');
+  const values = dataRange.getValues();
 
   const addMessage = (verbosityLevel, message) => {
     const thisMethod = cleanRawData;
@@ -1168,13 +1175,21 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
       thisMethod.messages.get(message)[0] += 1;
     else thisMethod.messages.set(message,[1]);
     };
+  
+  addMessage(2, `values retrieved from sheet ${rawDataSheet.getName()}`);
 
-  const dataRange = rawDataSheet.getRange('A1:Z');
-  const values = dataRange.getValues();
-  const rowCount = values.length;
+  const startTimer = Date.now();
 
   const fieldNames = getFieldNames(values[0]);
+  addMessage(2, `fieldNames are ${JSON.stringify(fieldNames)}`);
+  // list of all indexes that have an associated field
+  const fieldIndexes = [];
+  for (const fieldName in fieldNames)
+    fieldIndexes.push(fieldNames[fieldName]);
   
+  const allIndexes = Array(values[0].length).fill(0).map((e,i)=>e+i);
+  const nonFieldIndexes = allIndexes.filter(i => ! fieldIndexes.includes(i));
+
   // field descriptions
   const validator = new FieldValidator();
   for (const fieldName in fieldNames){
@@ -1196,7 +1211,6 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   }
 
   const convertType = (recordVal, newType) => {
-
     const currentType = getType(recordVal);
     if (currentType === newType)
       return recordVal;
@@ -1226,32 +1240,58 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   const uniques = []; 
   // store index of unique record
   const indexesOfUnique = [0]; // index 0 is for fieldNames
-
+  
+  let emptyRowCount = 0;
   let row_i = 0;
-  while(++row_i < rowCount){
+  while(++row_i < values.length){
     const record = values[row_i];
+
+    // if 10 empty records are encountered then is end of data set
+    if (emptyRowCount > 9){
+      addMessage(2, `found ${emptyRowCount} empty rows, so break`); 
+      break;
+    }
+
+    const rowIsEmpty = record.reduce((isEmpty,val)=>{
+      return [NaN,'',null,undefined].includes(val) ? isEmpty : false;
+    }, true);
+
+    if (rowIsEmpty){ ++emptyRowCount;
+      continue;
+    }
+
+    // delete all values from fields with indexes that are not in fieldIndexes
+    record.forEach((v, i) => {
+      if (nonFieldIndexes.includes(i))
+        delete record[i];
+    });
+
     // validation begin
     for (const fieldName in fieldNames){
       // fieldIndex should correspond with index of value from record
       const fieldIndex = fieldNames[fieldName]; 
       const testValue = record[fieldIndex];
-      try {
-        validator.validate(fieldName,testValue); 
-      } catch(e) {
+
+      try { validator.validate(fieldName,testValue);}
+      catch(e) {
         if (getType(e) === 'TypeError'){
           if ( ! e.expectedType) throw e;
           // try to convert according with field type (e.expectedType)
           const converted = convertType(testValue, e.expectedType);
+
           // validate again, if not thows then is a correct value/type
-          validator.validate(fieldName, converted);
+          try { validator.validate(fieldName, converted);}
+          catch(e){ e.rowIndex = row_i; throw e}
 
           addMessage(2,`converted {${getType(testValue)}} ${testValue} `+
-          `to {${getType(converted)}} ${converted}`);
+          `to {${getType(converted)}} ${converted} in row_i=${row_i}`);
 
           // write value again in record array
           record[fieldIndex] = converted;
+        } else {
+          e.rowIndex = row_i;
+          throw e;
         }
-        else throw e;
       }
     }
     // now the record should be of correct type for every value
@@ -1264,10 +1304,14 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
       indexesOfUnique.push(row_i);
     }
   }
+  
+  addMessage(2, `values.length ${values.length}`)
+  addMessage(2, `uniques.length ${uniques.length}`)
 
   // now we got all indexes of unique values 
   // let't remove them by constructing a new set of values
   const newValues = indexesOfUnique.map(i => values[i]);
+  addMessage(2, `newValues.length ${newValues.length}`);
 
   // sort records by date except first row (index 0) - field names
   // in order to do that, temporary change first record value (first field name)
@@ -1276,24 +1320,22 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   newValues[0][0] = new Date(0);
   newValues.sort((rec1, rec2) => rec1[0] - rec2[0]); 
   newValues[0][0] = firstFieldName;
+  addMessage(2, `newValues sorted`);
 
   // enlarge newValues with empty values to match range
-  if (newValues.length > values.length)
-    throw new Error('newValues.length > rowCound');
-  let start_i = values.length - newValues.length; 
-  while (start_i < rowCount){
+  const limit = values.length - newValues.length; 
+  let start_i = newValues.length;
+  while (start_i < values.length){
     newValues.push(Array(values[0].length));
     ++start_i;
   }
-
+  
+  addMessage(2, `procedure done in ${(Date.now() - startTimer)/1000} sec`);
   // reset values on range
   dataRange.setValues(newValues); 
+  addMessage(2, 'all new values written');
 
-  addMessage(2, `rowCount ${rowCount}`);
-  addMessage(2, `newValues.length ${newValues.length}`);
-
-  addMessage(2, `indexesOfUnique ${indexesOfUnique}`);
-  addMessage(2, `uniques.length ${uniques.length}`)
+  return 'done';
 } // procedure cleanRawData END
 //cleanRawData.messages = new Map();
 cleanRawData.verbosity = 0; 
@@ -1477,7 +1519,7 @@ class FieldValidator{
       if (Object.is(testValue.getTime(), NaN)){
         const err = new ValueError('Invalid Date Value');
         err.fieldName = fieldName;
-        err.expectedValue = new Date();
+        err.expectedValue = `something like ${new Date()}`;
         err.currentValue = testValue;
         throw err;
       }
