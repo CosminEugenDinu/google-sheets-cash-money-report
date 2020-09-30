@@ -1153,6 +1153,7 @@ function importData(
  * @param {Sheet} rawDataSheet
  */
 function cleanRawData(fromDate, toDate, company, rawDataSheet){
+  delete cleanRawData.messages;
   //const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
   const FieldValidator = libraryGet('FieldValidator');
