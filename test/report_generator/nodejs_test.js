@@ -10,7 +10,6 @@ const libraryGet = Code.__get__('libraryGet');
 const FieldValidator = libraryGet('FieldValidator');
 const Log = libraryGet('Log');
 const getType = libraryGet('getType');
-const convertType = libraryGet('convertType');
 const argumentsValidator = libraryGet('argumentsValidator');
 const validateRecord = libraryGet('validateRecord');
 const cleanRawData = libraryGet('cleanRawData');
@@ -78,10 +77,6 @@ tests.set('getType', () => {
   assert.strictEqual(getType(_object), 'Object');
   assert.strictEqual(getType(_map), 'Map');
   assert.strictEqual(getType(_set), 'Set');
-});
-
-tests.set('convertType', () => {
-  convertType();
 });
 
 tests.set('argumentsValidator', () => {
@@ -225,8 +220,9 @@ tests.set('FieldValidator', () => {
   },{name:'Error',message:'fieldIndex already exists'});
 
   const exactDateValues = new Set();
-  const date1 = new Date(), date2 = new Date(), date3 = new Date();
-  date2.setDate(date1.getDate()+1); date3.setDate(date2.getDate()+1);
+  let y = 2020, m = 9, d = 1;
+  const date1=new Date(y,m,d), date2=new Date(y,m,++d), date3=new Date(y,m,++d);
+  const invalidDate = new Date('xxx');
   exactDateValues.add(date2); exactDateValues.add(date3);
   const allTypesExcept_undefined = [null,true,'str',[],{},new Map(),new Set(),new Date()];
   const allTypesExcept_null = [undefined,true,'str',[],{},new Map(),new Set(),new Date()];
@@ -245,7 +241,7 @@ tests.set('FieldValidator', () => {
     [['num',0,'number',0,2],[0,1,2],[-1,3],allTypesExcept_int],
     [['num',0,'number',0,null],[0,1,2,10000],[-1,-2],allTypesExcept_int],
     [['num',0,'number',null,null,exactIntValues],[3,4],[-1,0,2,5],allTypesExcept_int],
-    [['date',0,'Date'],[date1,date2,date3,new Date()],[],allTypesExcept_date],
+    [['date',0,'Date'],[date1,date2,date3,new Date()],[invalidDate],allTypesExcept_date],
     [['date',0,'Date',date2],[date2,date3],[date1],allTypesExcept_date],
     [['date',0,'Date',date1,date2],[date1,date2],[date3],allTypesExcept_date],
     [['date',0,'Date',null,date2],[date1,date2],[date3],allTypesExcept_date],
@@ -268,11 +264,13 @@ tests.set('FieldValidator', () => {
       assert.strictEqual(validator.validate(fieldName, testValue),true);
     });
     wrongValues.map(testValue =>{
-      assert.throws(()=>{validator.validate(fieldName, testValue)},{name:'ValueError'},
+      assert.throws(()=>{validator.validate(fieldName, testValue)},
+        {name:'ValueError'},
       `field description ${fieldDescription}, wrong test value is ${testValue}`);
     });
     wrongValueTypes.map(testValue =>{
-      assert.throws(()=>{validator.validate(fieldName, testValue)},{name:'TypeError'},
+      assert.throws(()=>{validator.validate(fieldName, testValue)},
+        {name:'TypeError'},
       `field description ${fieldDescription}, wrong test value type is ${testValue}`);
     });
   }
@@ -332,21 +330,38 @@ tests.set('cleanRawData', () => {
     const rawDataSheet = {getRange(str){return Range;}};
 
     cleanRawData(fromDate, toDate, company, rawDataSheet);
+    console.log(cleanRawData.messages);
 
     // now values should be cleaned
     //assert.deepStrictEqual(values[1], correct_case);
   }
 
-  const throwing_cases = [
+  for (const throwingCase of [
     // wrong I_O_type value
     [new Date(2015,1,27), 'ref7', 'docType7', 'descr7', 3, 26],
     // wrong I_O_type value and type
     [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', '8', 26],
-    // wrong date value ant type
+    // wrong date value and type
     ['xx,yy,zz', 'ref9', 'docType9', 'descr9', 1, 26],
     // wrong value type and value
     [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', '8', 'xx'],
-  ];
+  ]){
+    // mocks
+    const fromDate = new Date(), toDate = new Date();
+    const company = new Map();
+    const values = [
+      ['date','ref','doc_type','descr','I_O_type','value'],
+      [...throwingCase],
+    ];
+    const Range = {getValues(){return values;}};
+    const rawDataSheet = {getRange(str){return Range;}};
+
+    assert.throws(()=>{
+      cleanRawData(fromDate, toDate, company, rawDataSheet);
+    },{name:'ValueError'},`should throw ValueError on case ${throwingCase}`);
+    console.log(cleanRawData.messages);
+  }
+
   const duplicates_removable_cases = [
     [
     [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', 0, 26],
@@ -361,15 +376,13 @@ tests.set('cleanRawData', () => {
     ]
   ];
   return
-
 });
 
 
 tests.get('Log')();
 tests.get('getType')();
-tests.get('convertType')();
 tests.get('argumentsValidator')();
 tests.get('FieldValidator')();
 tests.get('validateRecord')();
-tests.get('cleanRawData')();
+//tests.get('cleanRawData')();
 
