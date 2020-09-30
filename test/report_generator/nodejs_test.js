@@ -282,6 +282,7 @@ tests.set('validateRecord', () => {
 });
 
 tests.set('cleanRawData', () => {
+  cleanRawData.verbosity = 2;
   for (const [correctable_case, correct_case] of [
     [
     // correct record

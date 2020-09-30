@@ -1158,11 +1158,15 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   const FieldValidator = libraryGet('FieldValidator');
   const getType = libraryGet('getType');
 
-  const addMessage = message => {
-    const messages = cleanRawData.messages;
-    if (messages.has(message)) 
-      messages.get(message)[0] += 1;
-    else messages.set(message,[1]);
+  const addMessage = (verbosityLevel, message) => {
+    const thisMethod = cleanRawData;
+    if (thisMethod.verbosity < verbosityLevel)
+      return;
+    if ( ! thisMethod.hasOwnProperty('messages'))
+      thisMethod.messages = new Map();
+    if (thisMethod.messages.has(message)) 
+      thisMethod.messages.get(message)[0] += 1;
+    else thisMethod.messages.set(message,[1]);
     };
 
   const dataRange = rawDataSheet.getRange('A1:Z');
@@ -1234,7 +1238,7 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
           // validate again, if not thows then is a correct value/type
           validator.validate(fieldName, converted);
 
-          addMessage(`converted {${getType(testValue)}} ${testValue} `+
+          addMessage(2,`converted {${getType(testValue)}} ${testValue} `+
           `to {${getType(converted)}} ${converted}`);
 
           // write value again in record array
@@ -1246,7 +1250,8 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   }
 
 } // procedure cleanRawData END
-cleanRawData.messages = new Map();
+//cleanRawData.messages = new Map();
+cleanRawData.verbosity = 0; 
 
 
 /**
