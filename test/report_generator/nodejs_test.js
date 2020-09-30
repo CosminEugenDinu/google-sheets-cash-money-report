@@ -320,14 +320,16 @@ tests.set('cleanRawData', () => {
     [new Date('2015,1,26'), 'ref6', 'docType6', 'descr6', 0, 26],
     ],
   ]){
-    // mocks
+    // mock
     const fromDate = new Date(), toDate = new Date();
     const company = new Map();
-    const values = [
+    let values = [
       ['date','ref','doc_type','descr','I_O_type','value'],
       [...correctable_case],
     ];
-    const Range = {getValues(){return values;}};
+    const Range = {
+      getValues(){return values;},
+      setValues(newValues){values = newValues;}};
     const rawDataSheet = {getRange(str){return Range;}};
 
     cleanRawData(fromDate, toDate, company, rawDataSheet);
@@ -350,11 +352,13 @@ tests.set('cleanRawData', () => {
     // mocks
     const fromDate = new Date(), toDate = new Date();
     const company = new Map();
-    const values = [
+    let values = [
       ['date','ref','doc_type','descr','I_O_type','value'],
       [...throwingCase],
     ];
-    const Range = {getValues(){return values;}};
+    const Range = {
+      getValues(){return values;},
+      setValues(newValues){values = newValues;}};
     const rawDataSheet = {getRange(str){return Range;}};
 
     assert.throws(()=>{
@@ -363,20 +367,41 @@ tests.set('cleanRawData', () => {
     console.log(cleanRawData.messages);
   }
 
-  const duplicates_removable_cases = [
+  for (const [unsortedDuplicates, sortedWithoutDuplicates] of [
     [
-    [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', 0, 26],
-    [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', 0, 26],
-    [new Date(2015,1,28), 'ref8', 'docType8', 'descr7', 0, 26],
-    [new Date(2015,1,27), 'ref8', 'docType8', 'descr8', 0, 26],
+      [
+      ['date','ref','doc_type','descr','I_O_type','value'],
+      [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', 0, 26],
+      [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', 0, 26],
+      [new Date(2015,1,28), 'ref8', 'docType8', 'descr7', 0, 26],
+      [new Date(2015,1,27), 'ref8', 'docType8', 'descr8', 0, 26],
+      [new Date(2015,1,27), 'ref8', 'docType8', 'descr8', 0, 26],
+      ],
+      [
+      ['date','ref','doc_type','descr','I_O_type','value'],
+      [new Date(2015,1,27), 'ref8', 'docType8', 'descr8', 0, 26],
+      [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', 0, 26],
+      [new Date(2015,1,28), 'ref8', 'docType8', 'descr7', 0, 26],
+      [ , , , , , ,],
+      [ , , , , , ,],
+      ]
     ],
-    [
-    [new Date(2015,1,27), 'ref8', 'docType8', 'descr8', 0, 26],
-    [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', 0, 26],
-    [new Date(2015,1,28), 'ref8', 'docType8', 'descr7', 0, 26],
-    ]
-  ];
-  return
+  ]) {
+    // mocks
+    const fromDate = new Date(), toDate = new Date();
+    const company = new Map();
+    let values = [...unsortedDuplicates];
+
+    const Range = {
+      getValues(){return values;},
+      setValues(newValues){values = newValues;}};
+    const rawDataSheet = {getRange(str){return Range;}};
+
+    cleanRawData(fromDate, toDate, company, rawDataSheet);
+
+    //assert.deepStrictEqual(values, sortedWithoutDuplicates);
+    console.log(cleanRawData.messages);
+  }
 });
 
 

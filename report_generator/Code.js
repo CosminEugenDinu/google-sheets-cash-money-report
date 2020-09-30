@@ -1154,7 +1154,6 @@ function importData(
  */
 function cleanRawData(fromDate, toDate, company, rawDataSheet){
   delete cleanRawData.messages;
-  //const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
   const FieldValidator = libraryGet('FieldValidator');
   const getType = libraryGet('getType');
@@ -1221,6 +1220,12 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
       throw err;
     }
   };
+  
+  // this is a set of unique strings (hash of record)
+  // I used array for performance of "includes" and "indexOf" (node.js v14.8.0)
+  const uniques = []; 
+  // store index of unique record
+  const indexesOfUnique = [0]; // index 0 is for fieldNames
 
   let row_i = 0;
   while(++row_i < rowCount){
@@ -1234,6 +1239,7 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
         validator.validate(fieldName,testValue); 
       } catch(e) {
         if (getType(e) === 'TypeError'){
+          if ( ! e.expectedType) throw e;
           // try to convert according with field type (e.expectedType)
           const converted = convertType(testValue, e.expectedType);
           // validate again, if not thows then is a correct value/type
@@ -1248,8 +1254,46 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
         else throw e;
       }
     }
+    // now the record should be of correct type for every value
+    // in order to check if record is duplicate, hash it
+    // and add to a set of unique values
+    const recordHash = JSON.stringify(record); 
+    // if is already in uniques, then is duplicate
+    if ( ! uniques.includes(recordHash)){
+      uniques.push(recordHash);
+      indexesOfUnique.push(row_i);
+    }
   }
 
+  // now we got all indexes of unique values 
+  // let't remove them by constructing a new set of values
+  const newValues = indexesOfUnique.map(i => values[i]);
+
+  // sort records by date except first row (index 0) - field names
+  // in order to do that, temporary change first record value (first field name)
+  // such that this remains the first row after sort
+  const firstFieldName = newValues[0][0];
+  newValues[0][0] = new Date(0);
+  newValues.sort((rec1, rec2) => rec1[0] - rec2[0]); 
+  newValues[0][0] = firstFieldName;
+
+  // enlarge newValues with empty values to match range
+  if (newValues.length > values.length)
+    throw new Error('newValues.length > rowCound');
+  let start_i = values.length - newValues.length; 
+  while (start_i < rowCount){
+    newValues.push(Array(values[0].length));
+    ++start_i;
+  }
+
+  // reset values on range
+  dataRange.setValues(newValues); 
+
+  addMessage(2, `rowCount ${rowCount}`);
+  addMessage(2, `newValues.length ${newValues.length}`);
+
+  addMessage(2, `indexesOfUnique ${indexesOfUnique}`);
+  addMessage(2, `uniques.length ${uniques.length}`)
 } // procedure cleanRawData END
 //cleanRawData.messages = new Map();
 cleanRawData.verbosity = 0; 
