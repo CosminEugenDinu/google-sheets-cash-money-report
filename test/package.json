@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "rewire": "^5.0.0"
+  }
+}

@@ -3,9 +3,12 @@
  * Main function, call from sheet button, where it is assigned
  * This function is considered global
  */
+
 function main () {
 
 const Settings = libraryGet('settings');
+const getRecords = libraryGet('getRecords');
+const Log = libraryGet('Log');
 
 // global settings variables
 const REPORT_GENERATOR_SPREADSHEET_ID = "1nDNPcpgP9TlAcTSKASwFxuQQswdAI7Wm3I8Z-7rSGnE";
@@ -13,10 +16,7 @@ const INTERFACE_SHEET_NAME = "Interface";
 const SETTINGS_SHEET_NAME = "settings";
 const RAWDATA_SHEET_SUFFIX = "_rawdata";
 
-const TEMPLATE = defaultTemplate();
 
-// instantiate log function
-const log = Log(REPORT_GENERATOR_SPREADSHEET_ID, 0, [10,5]);
   
 const repGenSprSheet = SpreadsheetApp.openById(REPORT_GENERATOR_SPREADSHEET_ID);
 
@@ -26,8 +26,9 @@ const settingsSheet = repGenSprSheet.getSheetByName(SETTINGS_SHEET_NAME);
 
 const verbosity = interfaceSheet.getSheetValues(8,5,1,1)[0][0];
 // v=0 - critical, v=1 - informal, v=2 - too verbose
-const v = +verbosity;
-
+// const v = +verbosity;
+// instantiate log function
+const [v, log] = Log(interfaceSheet, [10,5], +verbosity);
 
 const settings = new Settings(settingsSheet, 50, 1000);
 
@@ -57,69 +58,85 @@ updateRawDataSheetNames(rawDataSheets, computedRawDataSheetNames);
 const procedure = interfaceSheet.getSheetValues(8,1,1,1)[0][0];
 const companyAlias = interfaceSheet.getSheetValues(8,2,1,1)[0][0];
 const [fromDate, toDate] = interfaceSheet.getSheetValues(8,3,1,2)[0];
+const company = companies.get(companyAlias);
 
 // data source sheet corresponds with chosen company alias from drop-down
 const rawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SUFFIX);
-//const dataRange = rawDataSheet.getRange('A2:F');
-
-const company = companies.get(companyAlias);
-// cannot run without cleanRawData
-//const dataRecords = getRecords(dataRange);
-const getRecords = libraryGet('getRecords');
-const dataRecords = getRecords(rawDataSheet);
-const template = TEMPLATE;
-const targetSpreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
-
 
 //---------------------------------------------------------------------------------
 
 if (procedure==='renderReport'){
-  const procedureDone = libraryGet('renderReport')(
-    fromDate,
-    toDate,
-    company,
-    dataRecords,
-    template,
-    targetSpreadsheet);
+  let args;
+  try{
+    const dataRecords = getRecords(rawDataSheet, v, log);
+    const template = defaultTemplate();
+    const targetSpreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
+
+    args = [fromDate, toDate, company, dataRecords, template, targetSpreadsheet, v, log];
+
+  } catch(e){
+    throw new Error(
+      `When initializing arguments for procedure ${procedure}, got:\n${e.message}`);
+  }
+
+  try{
+    libraryGet(procedure)(...args);
+  } catch (e) {
+    throw new Error(`Procedure ${procedure} failed with:\n${e.message}`);
+  }
 }
 
 //---------------------------------------------------------------------------------
 
-//const dataLinks = settingsSheet.getSheetValues(1,16,1000,3);
-// spreadsheet links iterable
-const dataLinks = settings.getField(`link.${companyAlias}`).getValues();
-
-// this pattern is uset to search records in source spreadsheets (dataLinks);
-const identifierPattern = settings.getField('procedure.variable.value').getByIndex(
-  settings.getField('procedure.variable.name')
-  .getByValue('importData.identifierPattern')
-  );
-const [sheetToImportTo] = rawDataSheets.filter(
-  sheet => sheet.getName() === company.get('alias')+RAWDATA_SHEET_SUFFIX
-  )
-
 if (procedure==='importData'){
-  const procedureDone = libraryGet(procedure)(
-    fromDate,
-    toDate,
-    company,
-    dataLinks,
-    identifierPattern,
-    sheetToImportTo
-  );
+  let args;
+  try{
+    // spreadsheet links iterable
+    const dataLinks = settings.getField(`link.${companyAlias}`).getValues();
+    // this pattern is uset to search records in source spreadsheets (dataLinks);
+    const identifierPattern = settings.getField('procedure.variable.value').getByIndex(
+      settings.getField('procedure.variable.name')
+      .getByValue('importData.identifierPattern')
+      );
+    const [sheetToImportTo] = rawDataSheets.filter(
+      sheet => sheet.getName() === company.get('alias')+RAWDATA_SHEET_SUFFIX
+      );
+
+    args = [fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo, v, log];
+
+  } catch(e){
+    throw new Error(
+      `When initializing arguments for procedure ${procedure}, got:\n${e.message}`);
+  }
+
+  try{
+    libraryGet(procedure)(...args);
+  } catch(e){
+    throw new Error(`Procedure ${procedure} failed with:\n${e.message}`);
+  }
 }
 
 //---------------------------------------------------------------------------------
 
 if (procedure === 'cleanRawData'){
-  const procedureDone = libraryGet(procedure)(
-    fromDate,
-    toDate,
-    company,
-    rawDataSheet
-  );
+  v(0)&& log('Procedure cleanRawData begin');
+
+  const args = [fromDate, toDate, company, rawDataSheet];
+  const messages = [];
+
+  try{
+    const cleanRawData = libraryGet(procedure);
+    cleanRawData.verbosity = verbosity;
+    cleanRawData(...args);
+    for (const [mes, count] of cleanRawData.messages)
+      log(count, mes);
+  } catch(e){
+    throw new Error(`Procedure ${procedure} failed with:\n${e.message}\n${JSON.stringify(e)}`);
+  }
+  v(0)&& log('Procedure cleanRawData END');
 }
 
+} // main END
 //---------------------------------------------------------------------------------
 
 
@@ -142,7 +159,7 @@ function mergeDateRecords(records_1, records_2){
     let alsoInRecords_2 = false;
     for (const map2 of records_2)
       if (areTheSame(map1, map2)){
-        v>2&& log(`Record ${Array.from(map1.values())} is duplicate, so skipped`); 
+         log(`Record ${Array.from(map1.values())} is duplicate, so skipped`); 
         alsoInRecords_2 = true;
         break;
       }
@@ -175,7 +192,7 @@ function areTheSame(map_1, map_2){
  *      - {string} keys - dates (ISO 8601)
  *      - {Array} values - of {Map} records, like {'date'=>{Date}, 'ref'=>32, etc.} 
  */
-function searchRecords(spreadsheet, identifierPattern, rowLim=50, colLim=6){
+function searchRecords(spreadsheet, identifierPattern, v, log, rowLim=50, colLim=6){
   const records = new Map();
 
   // measurements
@@ -242,7 +259,7 @@ function searchRecords(spreadsheet, identifierPattern, rowLim=50, colLim=6){
   }
 
 // log accumulated messages
-v>1&& messages.forEach((vals, mess) => log(mess, vals.length, JSON.stringify(vals)));
+messages.forEach((vals, mess) => v(1) && log(mess, vals.length, JSON.stringify(vals)));
 return records;
 }
 
@@ -331,36 +348,6 @@ function updateRawDataSheetNames(rawDataSheets, computedNames){
       )
 }
 
-/**
- * Logging function - logs to specified cell
- *      - instantiate with const log = Log(spreadsheetId, sheetIndex, cellPos);
- *      - usage: log("Welcome to log console!");
- *
- * @param {Sheet} spreadsheetId - https://docs.google.com/spreadsheets/d/spreadsheetId/edit#gid=0
- * @param {Number} sheetIndex - numeric index (including 0) of {Sheet} targeted
- * @param {Array} cellPos - tuple array with cell position [x, y] - console output cell
- */
-function Log(spreadsheetId, sheetIndex, cellPos){
-  const spreadSheet = SpreadsheetApp.openById(spreadsheetId);
-  const sheet = spreadSheet.getSheets()[sheetIndex];
-  // clear console space
-  sheet.getRange(...cellPos,8,3).clear();
-  const range = sheet.getRange(...cellPos,8,3).merge();
-  const cell = range.getCell(1,1);
-  cell.setBackground("black");
-  cell.setFontColor("white");
-  cell.setVerticalAlignment("top");
-  
-  const logs = [];
-
-  const log = (...args) => {
-    logs.push(args.toString());
-    cell.setValue('> '+logs.join('\n> '));
-    // returns true to permit chaining like: log('something') && another_statement;
-    return true;
-  }
-  return log;
-}
 
 
 function isObject(type){
@@ -476,10 +463,59 @@ function defaultTemplate(){
   return TEMPLATE;
 }
 
+
+
+
+
+
+
 function libraryGet(required){
 
 // library members dictionary
 const library = new Map();
+
+/**
+ * Logging function - logs to specified cell
+ *      - instantiate with const [v, log] = Log(sheet, cellPos, defaultVerbosity);
+ *      - usage: v(2)&& log("Welcome to log console!");
+ *
+ * @param {Sheet} sheet
+ * @param {Array} cellPos - tuple array with cell position [x, y] - console output cell
+ * @param {number} defaultVerbosity
+ */
+function Log(sheet, cellPos, defaultVerbosity){
+  // default verbosity is set from UI
+  const _defaultVerbosity = defaultVerbosity;
+  let _currentVerbosity = 0;
+
+  // clear console space
+  //sheet.getRange(...cellPos,8,3).clear();
+  sheet.getRange(...cellPos,8,3).clear();
+  const range = sheet.getRange(...cellPos,8,3).merge();
+  const cell = range.getCell(1,1);
+  cell.setBackground("black");
+  cell.setFontColor("white");
+  cell.setVerticalAlignment("top");
+  
+  const _logs = [];
+
+  const log = (...args) => {
+    if (_defaultVerbosity >= _currentVerbosity){
+      _logs.push(args.toString());
+      cell.setValue('> '+_logs.join('\n> '));
+    }
+    // returns true to permit chaining like: log('something') && another_statement;
+    return true;
+  }
+  
+  const setVerbosity = level => {
+    _currentVerbosity = level;
+    return _defaultVerbosity >= _currentVerbosity;
+  }
+
+  return [setVerbosity, log];
+  //return log;
+}
   
 class Settings{
   constructor(settingsSheet, rowLim, colLim){
@@ -558,8 +594,8 @@ function renderReport(
     company,
     dataRecords,
     template,
-    targetSpreadsheet){
-  v>0&& log('Procedure renderReport begin');
+    targetSpreadsheet, v, log){
+  v(0)&& log('Procedure renderReport begin');
 
   /**
    * Class Element - is a piece of sheet... (cell, range)
@@ -954,7 +990,7 @@ function renderReport(
        */
 
       // delete existing sheets except first
-      v>2&& log(`Deleting existing report sheets except first`);
+      v(2)&& log(`Deleting existing report sheets except first`);
       targetSpreadsheet.getSheets().forEach(sheet =>{
         if (sheet.getIndex() === 1) 
           // cover sheet 
@@ -964,7 +1000,7 @@ function renderReport(
       }
       );
       const dates = datesBetween(fromDate, toDate);
-      v>2&& log(`Rendering reports between ${fromDate.toLocaleDateString('ro-RO')} and ${toDate.toLocaleDateString('ro-RO')}`);
+      v(2)&& log(`Rendering reports between ${fromDate.toLocaleDateString('ro-RO')} and ${toDate.toLocaleDateString('ro-RO')}`);
 
       let sheetIndex = 1
       for (const date of dates){
@@ -973,7 +1009,7 @@ function renderReport(
         const sheet = targetSpreadsheet.insertSheet(sheetIndex++);
         const dayReport = new DailyReport(date, company, dataRecords, this.balanceCalculator());
         dayReport.render(sheet, this.template);
-        v>2&& log(`Day report ${new Date(date).toLocaleDateString('ro-RO')} rendered!`);
+        v(2)&& log(`Day report ${new Date(date).toLocaleDateString('ro-RO')} rendered!`);
       }
 
       return;
@@ -988,9 +1024,8 @@ function renderReport(
   report.render(targetSpreadsheet);
   //================================================================
 
-  v>0&& log('Procedure renderReport END');
+  v(2)&& log('Procedure renderReport END');
 } // renderReport END
-
 /**
  * Searches for company data records in provided links to standalone spreadsheets,
  * and populate corresponding rawDataSheet.
@@ -1005,9 +1040,9 @@ function importData(
     company,
     dataLinks,
     identifierPattern,
-    sheetToImportTo){
-  v>0&& log('Procedure importData begin');
-  v>2&& log(`Company alias: ${company.get('alias')}`);
+    sheetToImportTo, v, log){
+  v(0)&& log('Procedure importData begin');
+  v(2)&& log(`Company alias: ${company.get('alias')}`);
   const getRecords = libraryGet('getRecords');
 
   // tableName the prefix before '.' in field name, like tableName.fieldName
@@ -1023,7 +1058,7 @@ function importData(
           ids.push(sheetId);
           numOfEmpty = 0;
         } catch(e){
-          v>0&& log(`${e}\nSeems that link:\n${link}\ndoes not match pattern.`);
+          v(0)&& log(`${e}\nSeems that link:\n${link}\ndoes not match pattern.`);
         }
       else throw new ReferenceError('No spreadsheet link.');
     }
@@ -1038,45 +1073,45 @@ function importData(
         spreadsheets.push(spreadsheet);
         return spreadsheets;
       } catch(e){
-        v>0&& log('When opening sheet with id\n', sheetId, '\ngot: ', e);
+        v(0)&& log('When opening sheet with id\n', sheetId, '\ngot: ', e);
         return spreadsheets;
       }
     }, []
   );
 
   if ( ! srcSpreadsheets.length){
-    v>0&& log('No source spreadsheets opened!'); 
+    v(0)&& log('No source spreadsheets opened!'); 
     return 2;
   } else {
-    v>1&& log(`Spreadsheets opened ${srcSpreadsheets.length}, [${srcSpreadsheets.map(ss => ss.getName())}]`);
+    v(1)&& log(`Spreadsheets opened ${srcSpreadsheets.length}, [${srcSpreadsheets.map(ss => ss.getName())}]`);
   }
 
   const foundRecords = new Map(); 
   for (const sheet of srcSpreadsheets){
-    for (const [dateStr, record] of searchRecords(sheet, identifierPattern)){
+    for (const [dateStr, record] of searchRecords(sheet, identifierPattern, v, log)){
       foundRecords.set(dateStr, record);
     }
   }
 
   if (!foundRecords.size)
-    v>1&& log(`No records found in spreadsheet ${srcSpreadsheets[0].getName()}`);
+    v(1)&& log(`No records found in spreadsheet ${srcSpreadsheets[0].getName()}`);
   else
-    v>2&& log(`Found ${foundRecords.size} day-records in spreadsheets: [${srcSpreadsheets.map(ss => ss.getName())}]`);
+    v(2)&& log(`Found ${foundRecords.size} day-records in spreadsheets: [${srcSpreadsheets.map(ss => ss.getName())}]`);
 
   
   // retrieve existing records in raw data sheet
-  const existingRecords = getRecords(sheetToImportTo);
-  v>2&& log(`${existingRecords.size} day-records exists in ${sheetToImportTo.getName()}`);
+  const existingRecords = getRecords(sheetToImportTo, v, log);
+  v(2)&& log(`${existingRecords.size} day-records exists in ${sheetToImportTo.getName()}`);
 
   const dates = datesBetween(fromDate, toDate);
-  v>2&& log(`Searching found-records between ${new Date(fromDate).toLocaleDateString('ro-RO')} and ${new Date(toDate).toLocaleDateString('ro-RO')}...`);
+  v(2)&& log(`Searching found-records between ${new Date(fromDate).toLocaleDateString('ro-RO')} and ${new Date(toDate).toLocaleDateString('ro-RO')}...`);
 
   for (const dateStr of dates){
     const foundDateRecords = foundRecords.get(dateStr);
     const existingDateRecords = existingRecords.get(dateStr);
     if (foundDateRecords && existingDateRecords){
-      v>1&& log(`Duplicates found on date ${new Date(dateStr).toLocaleDateString('ro-RO')}.`);
-      v>2&& log('resolving same-date-key conflicts...');
+      v(1)&& log(`Duplicates found on date ${new Date(dateStr).toLocaleDateString('ro-RO')}.`);
+      v(2)&& log('resolving same-date-key conflicts...');
       const mergedDateRecords = mergeDateRecords(foundDateRecords, existingDateRecords);
       existingRecords.set(dateStr, mergedDateRecords);
     } else if (foundDateRecords){
@@ -1084,7 +1119,7 @@ function importData(
     }
   }
 
-  v>2&& log('updating raw data sheet...')
+  v(2)&& log('updating raw data sheet...')
   const rawValues = [];
   const keyDates = Array.from(existingRecords.keys()).sort();
   keyDates.forEach(
@@ -1105,139 +1140,535 @@ function importData(
   const rawDataRange = sheetToImportTo.getRange(2, 1, rawValues.length, rawValues[0].length);
   // delete all existing records
   sheetToImportTo.getRange('A2:F').clear();
-  v>2&& log(`Deleted all 'A2:F' values from sheet ${sheetToImportTo.getName()}!`); 
+  v(2)&& log(`Deleted all 'A2:F' values from sheet ${sheetToImportTo.getName()}!`); 
   // writing new values
   
-  v>2&& log(`Writing new values...`);
+  v(2)&& log(`Writing new values...`);
   rawDataRange.setValues(rawValues);
 
-  v>0&& log('Procedure importData END');
+  v(0)&& log('Procedure importData END');
 } // importData END
 
-
+/**
+ * @param {Date} fromDate
+ * @param {Date} toDate
+ * @param {Map} company - dict with company info keys like 'name', 'alias', etc
+ * @param {Sheet} rawDataSheet
+ */
 function cleanRawData(fromDate, toDate, company, rawDataSheet){
-  v>0&& log('Procedure cleanRawData begin');
-
-  const validate = libraryGet('validateRecord');
+  delete cleanRawData.messages;
   const getFieldNames = libraryGet('getFieldNames');
+  const FieldValidator = libraryGet('FieldValidator');
+  const getType = libraryGet('getType');
+  
+  // retrieve from spreadsheet
+  const dataRange = rawDataSheet.getRange('A1:Z');
+  const values = dataRange.getValues();
 
-  const inspectRange = rawDataSheet.getRange('A1:Z');
-  const values = inspectRange.getValues();
-  const rowCount = values.length;
-  v>1&& log(`Records in ${rawDataSheet.getName()}: ${rowCount}`);
+  const addMessage = (verbosityLevel, message) => {
+    const thisMethod = cleanRawData;
+    if (thisMethod.verbosity < verbosityLevel)
+      return;
+    if ( ! thisMethod.hasOwnProperty('messages'))
+      thisMethod.messages = new Map();
+    if (thisMethod.messages.has(message)) 
+      thisMethod.messages.get(message)[0] += 1;
+    else thisMethod.messages.set(message,[1]);
+    };
+  
+  addMessage(2, `values retrieved from sheet ${rawDataSheet.getName()}`);
+
+  const startTimer = Date.now();
 
   const fieldNames = getFieldNames(values[0]);
-  v>2&& log(`Fields are: ${JSON.stringify(fieldNames)}`)
+  addMessage(2, `fieldNames are ${JSON.stringify(fieldNames)}`);
+  // list of all indexes that have an associated field
+  const fieldIndexes = [];
+  for (const fieldName in fieldNames)
+    fieldIndexes.push(fieldNames[fieldName]);
+  
+  const allIndexes = Array(values[0].length).fill(0).map((e,i)=>e+i);
+  const nonFieldIndexes = allIndexes.filter(i => ! fieldIndexes.includes(i));
 
-/*
-  const clean = (row, row_i) => {
-    for (let i=0; i<row.length; i++){
+  // field descriptions
+  const validator = new FieldValidator();
+  for (const fieldName in fieldNames){
+    const fieldIndex = fieldNames[fieldName];
+    if (fieldName === 'date')
+      validator.setField(fieldName,fieldIndex,'Date');
+    else if (fieldName === 'ref')
+      validator.setField(fieldName,fieldIndex,'string');
+    else if (fieldName === 'doc_type')
+      validator.setField(fieldName,fieldIndex,'string');
+    else if (fieldName === 'descr')
+      validator.setField(fieldName,fieldIndex,'string');
+    else if (fieldName === 'I_O_type')
+      validator.setField(fieldName,fieldIndex,'number',0,1);
+    else if (fieldName === 'value')
+      validator.setField(fieldName,fieldIndex,'number');
+    else
+      throw new Error(`Unknown fieldName ${fieldName}`);
+  }
 
-      const col_i = i + 1;
-      const origVal = row[i];
+  const convertType = (recordVal, newType) => {
+    const currentType = getType(recordVal);
+    if (currentType === newType)
+      return recordVal;
+    
+    const typeConstructors = new Map();
+    typeConstructors.set('number', Number);
+    typeConstructors.set('string', JSON.stringify);
+    typeConstructors.set('Date', dateLike => new Date(dateLike));
 
-      try {
-        validators[i](row[i]);
-      } catch (e) {
-        // if ref is not string
-        if (e.message.match(/.*\sis\snot\sstring/)){
-          const newVal = `${row[i]}`;
-          const cell = range.getCell(row_i+1,col_i);
-          cell.setValue(newVal);
-          cell.setFontColor('red');
-          // throw new Error(`Changed from ${origVal} to ${cell.getValue()}, row_i:${row_i}, col_i:${col_i}`);
-          v>0&& log(`Changed from ${origVal} to ${cell.getValue()}, row_i:${row_i}, col_i:${col_i}`);
-        }
-        if (e.message.match(/.*\sis\snot\snumber/)){
-          const cell = range.getCell(row_i+1,col_i);
-          cell.setBackground('pink');
-          throw new Error(`Sheet_row:${row_i+2},col_i:${col_i},val:${e.message}`);
+    try {
+      const converted = typeConstructors.get(newType)(recordVal);
+      return converted;
+    } catch(e) {
+      // if we got here, it means that type of record value was not converted
+      const err = new Error('Type not converted');
+      err.method = 'convertType';
+      err.recordVal = recordVal;
+      err.currentType = currentType;
+      err.expectedType = newType;
+      err.orginalError = e;
+      throw err;
+    }
+  };
+  
+  // this is a set of unique strings (hash of record)
+  // I used array for performance of "includes" and "indexOf" (node.js v14.8.0)
+  const uniques = []; 
+  // store index of unique record
+  const indexesOfUnique = [0]; // index 0 is for fieldNames
+  
+  let emptyRowCount = 0;
+  let row_i = 0;
+  while(++row_i < values.length){
+    const record = values[row_i];
+
+    // if 10 empty records are encountered then is end of data set
+    if (emptyRowCount > 9){
+      addMessage(2, `found ${emptyRowCount} empty rows, so break`); 
+      break;
+    }
+
+    const rowIsEmpty = record.reduce((isEmpty,val)=>{
+      return [NaN,'',null,undefined].includes(val) ? isEmpty : false;
+    }, true);
+
+    if (rowIsEmpty){ ++emptyRowCount;
+      continue;
+    }
+
+    // delete all values from fields with indexes that are not in fieldIndexes
+    record.forEach((v, i) => {
+      if (nonFieldIndexes.includes(i))
+        delete record[i];
+    });
+
+    // validation begin
+    for (const fieldName in fieldNames){
+      // fieldIndex should correspond with index of value from record
+      const fieldIndex = fieldNames[fieldName]; 
+      const testValue = record[fieldIndex];
+
+      try { validator.validate(fieldName,testValue);}
+      catch(e) {
+        if (getType(e) === 'TypeError'){
+          if ( ! e.expectedType) throw e;
+          // try to convert according with field type (e.expectedType)
+          const converted = convertType(testValue, e.expectedType);
+
+          // validate again, if not thows then is a correct value/type
+          try { validator.validate(fieldName, converted);}
+          catch(e){ e.rowIndex = row_i; throw e}
+
+          addMessage(2,`converted {${getType(testValue)}} ${testValue} `+
+          `to {${getType(converted)}} ${converted} in row_i=${row_i}`);
+
+          // write value again in record array
+          record[fieldIndex] = converted;
+        } else {
+          e.rowIndex = row_i;
+          throw e;
         }
       }
     }
-  };
-  const cleanRecords = () => {
-    for (let i=1; i<rangeValues.length; i++){
-      const row = rangeValues[i];
-      clean(row, i);
+    // now the record should be of correct type for every value
+    // in order to check if record is duplicate, hash it
+    // and add to a set of unique values
+    const recordHash = JSON.stringify(record); 
+    // if is already in uniques, then is duplicate
+    if ( ! uniques.includes(recordHash)){
+      uniques.push(recordHash);
+      indexesOfUnique.push(row_i);
     }
-    v>0&& log('All records are cleaned.');
-  };
-*/
-
-  for (let i=1; i<values.length; i++){
-    // sheet row number
-    const rangeRowNum = i + 1;
-    const row = values[i];
-    try {
-      validate(row, fieldNames);
-    } catch(e) {
-      log(e);
-      throw new Error('ceva' + e.message);
-    }
-    if (i === 3) break;
-
   }
+  
+  addMessage(2, `values.length ${values.length}`)
+  addMessage(2, `uniques.length ${uniques.length}`)
 
+  // now we got all indexes of unique values 
+  // let't remove them by constructing a new set of values
+  const newValues = indexesOfUnique.map(i => values[i]);
+  addMessage(2, `newValues.length ${newValues.length}`);
 
-  v>0&& log('Procedure cleanRawData END');
+  // sort records by date except first row (index 0) - field names
+  // in order to do that, temporary change first record value (first field name)
+  // such that this remains the first row after sort
+  const firstFieldName = newValues[0][0];
+  newValues[0][0] = new Date(0);
+  newValues.sort((rec1, rec2) => rec1[0] - rec2[0]); 
+  newValues[0][0] = firstFieldName;
+  addMessage(2, `newValues sorted`);
+
+  // enlarge newValues with empty values to match range
+  const limit = values.length - newValues.length; 
+  let start_i = newValues.length;
+  while (start_i < values.length){
+    newValues.push(Array(values[0].length));
+    ++start_i;
+  }
+  
+  addMessage(2, `procedure done in ${(Date.now() - startTimer)/1000} sec`);
+  // reset values on range
+  dataRange.setValues(newValues); 
+  addMessage(2, 'all new values written');
+
+  return 'done';
 } // procedure cleanRawData END
+//cleanRawData.messages = new Map();
+cleanRawData.verbosity = 0; 
+
+
+/**
+ * Arguments validator
+ */
+function argumentsValidator(){
+  const getType = libraryGet('getType');
+  // variable enclosed by setArgTypes function
+  const _argTypes = [];
+
+  const setArgTypes = (...argTypes)=>argTypes.forEach(
+    type =>{
+      if (typeof type !== 'string')
+        throw new TypeError(`Type descriptor ${typeof type} is not valid`);
+      _argTypes.push(type);
+      }
+  );
+  
+  const validateArgs = (...currArgs) => {
+    if (currArgs.length !== _argTypes.length){
+      throw new TypeError('Wrong number of arguments');
+    }
+    _argTypes.forEach((type, i) =>{
+      const currArg = currArgs[i];
+      if (getType(currArg) !== type){
+        const err = new TypeError('Invalid Signature');
+        err.expectedType = _argTypes[i];
+        throw err;
+      }
+    });
+  }; 
+  // returns setter and validator closure functions
+  return [setArgTypes, validateArgs];
+
+} // argumentsValidator END
+
+/**
+ * @param {*} obj
+ * @returns {string}
+ */
+function getType(obj){
+  if (obj === null)
+    return 'null';
+  if (obj === undefined)
+    return 'undefined';
+  if (Object.is(obj, NaN))
+    return 'nan';
+  if (Object.is(obj, Boolean(obj)))
+    return 'boolean';
+  if (typeof obj === 'object')
+    // returns 'Object', 'Array', 'Map', 'Set', etc
+    return obj.constructor.name;
+  if (typeof obj === 'function')
+    // returns 'Function'
+    return obj.constructor.name;
+  // returns 'number', 'string'
+  return typeof obj;
+}
+
+
+class FieldValidator{
+  constructor(){
+    this._fieldNames = new Map();
+    this._fieldIndexes = new Map();
+    this._validTypes = ['string', 'number', 'boolean', 'Date'];
+  }
+  /**
+   * @param {string} fieldName
+   * @param {number} fieldIndex
+   * @param {string} fieldType
+   * @param {*} [minValue]
+   * @param {*} [maxValue]
+   * @param {Set} [exactValues]
+   */
+  setField(fieldName, fieldIndex, fieldType, minValue, maxValue, exactValues){
+    
+    const [setArgTypes, validateArgs] = argumentsValidator();
+
+    // number of actual parameters
+    // last undefined actual parameters are excluded
+    const paramLength = arguments.length;
+    let lastArgIndex = paramLength;
+    while (--lastArgIndex > 0){
+      if (arguments[lastArgIndex] !== undefined) break;
+    }
+    const argsLength = lastArgIndex + 1;
+
+    if (argsLength < 3)
+      throw new TypeError('Invalid number of arguments');
+
+    if (argsLength === 3)
+      setArgTypes('string','number','string');
+    else if (argsLength === 4){
+      const minValueType = getType(minValue)==='null'?'null':fieldType;
+      setArgTypes('string','number','string', minValueType);
+    } else if (argsLength === 5){
+      const minValueType = getType(minValue)==='null'?'null':fieldType;
+      const maxValueType = getType(maxValue)==='null'?'null':fieldType;
+      setArgTypes('string','number','string', minValueType, maxValueType);
+    } else if (argsLength === 6)
+      setArgTypes('string','number','string', 'null', 'null', 'Set');
+
+
+    //setArgTypes('string','number','string',fieldType,fieldType,'Set');
+    validateArgs(...arguments);
+
+    const field = new Map();
+    if (this._fieldNames.has(fieldName))
+      throw new Error('fieldName already exists');
+    if (this._fieldIndexes.has(fieldIndex))
+      throw new Error('fieldIndex already exists'); 
+    field.set('name', fieldName);
+    field.set('index', fieldIndex);
+    field.set('type', fieldType);
+
+    if (minValue !== null && minValue !== undefined && exactValues === undefined)
+      field.set('minValue', minValue);
+    // set max value only if exactValues are not proviced
+    if (maxValue !== null && maxValue !== undefined && exactValues === undefined)
+      field.set('maxValue', maxValue);
+    // throw if type of exactValues is not the same as fieldType
+    if (exactValues !== undefined){
+      for (const exactVal of exactValues.keys()){
+        if (getType(exactVal) !== fieldType){
+          const err = new TypeError('Invalid field exactType');
+          err.fieldName = fieldName;
+          err.expectedType = fieldType;
+          err.currentType = getType(exactVal);
+          throw err;
+        }
+      }
+      field.set('exactValues', exactValues);
+    }
+
+    this._fieldNames.set(fieldName, field); 
+    // cannot be tow fields with same index;
+    this._fieldIndexes.set(fieldIndex, field);
+    return this;
+  }
+  
+  /**
+   * @param {string} fieldName
+   * @param {*} testValue
+   */
+  validate(fieldName, testValue){
+    const [setArgTypes, validateArgs] = argumentsValidator();
+    // validate arguments
+    setArgTypes('string', getType(testValue));
+    validateArgs(...arguments);
+
+    class ValueError extends Error{
+      constructor(msg){
+        super(msg);
+        this.name = 'ValueError';}}
+    class NotFoundError extends Error{
+      constructor(msg){
+        super(msg);
+        this.name = 'NotFoundError';}}
+
+    if ( ! this._fieldNames.has(fieldName))
+      throw new NotFoundError('Field not found');
+
+    const field = this._fieldNames.get(fieldName);
+
+    const valType = getType(testValue); 
+    // test for type
+    if (field.get('type') !== valType){
+      const err = new TypeError('Invalid Value Type');
+      err.fieldName = fieldName;
+      err.expectedType = field.get('type');
+      err.currentType = valType;
+      throw err;
+    }
+
+    // test for value
+    if(field.get('type') === 'Date'){
+      // explicit test for invalid date
+      if (Object.is(testValue.getTime(), NaN)){
+        const err = new ValueError('Invalid Date Value');
+        err.fieldName = fieldName;
+        err.expectedValue = `something like ${new Date()}`;
+        err.currentValue = testValue;
+        throw err;
+      }
+    }
+    if (field.has('minValue')){
+      if (testValue < field.get('minValue')){
+        const err = new ValueError('Value less than minValue');
+        err.fieldName = fieldName;
+        err.expectedValue = `>= ${field.get('minValue')}`;
+        err.currentValue = `${testValue}`;
+        throw err;
+      }
+    }
+    if (field.has('maxValue')){
+      if (testValue > field.get('maxValue')){
+        const err = new ValueError('Value greater than maxValue');
+        err.fieldName = fieldName;
+        err.expectedValue = `<= ${field.get('maxValue')}`;
+        err.currentValue = testValue;
+        throw err;
+      }
+    }
+    if (field.has('exactValues')){
+      if ( ! field.get('exactValues').has(testValue)){
+        const err = new ValueError('Value not found in exactValues Set');
+        err.fieldName = fieldName;
+        err.currentValue = testValue;
+        throw err;
+      }
+    }
+    
+    return true;
+  }
+  getFieldByName(fieldName){
+    return this._fieldNames.get(fieldName);
+  }
+  getFieldByIndex(fieldIndex){
+    return this._fieldIndexes.get(fieldIndex);
+  }
+}
+
 
 /**
  * @param {Array} record
- * @param {Object} fieldNames
+ * @param {Object} fieldNames - key: {string} fieldName, val: {Number} index
  */
 function validateRecord(record, fieldNames){
+
   const validators = new Map();
+
   validators.set('date',
     date => {
       if (isNaN(date.getTime()))
-        throw new TypeError(`Date ${typeof date} ${date} is not a valid {Date} instance.`);
+        throw new TypeError(
+          `In field ${fieldNames['date']} ${typeof date} ${date} is not valid Date.`);
     });
+
   validators.set('ref',
-    ref => {
+    (ref, fieldName) => {
       const type = typeof ref;
       const val = ref;
-      if (type !== 'string')
-        throw new TypeError(`${type}, val:${val} is not string`); 
+      const expectedType = 'string';
+      const errorInfo = {
+          field_name: fieldName,
+          field_index: fieldNames[fieldName],
+          value_type: type,
+          value: val,
+          expected_type: expectedType,
+          errors: [],
+          fromRef: "fromRef"
+      };
+
+      if (type !== expectedType)
+        errorInfo.errors.push('type_error');
+        //throw new TypeError(JSON.stringify({...errorInfo, )); 
+
+      if (errorInfo.errors.length)
+        throw new Error(JSON.stringify(errorInfo));
     });
+
   validators.set('doc_type',
     doc_type => {
       const type = typeof doc_type;
       const val = doc_type;
-      if (type !== 'string')
-        throw new TypeError(`${type}, val:${val} is not string`); 
+      const expectedType = 'string';
+
+      if (type !== expectedType)
+        throw new TypeError(JSON.stringify({
+          field_name: fieldName,
+          field_index: fieldNames[fieldName],
+          value_type: type,
+          value: val,
+          expected_type: expectedType
+        })); 
     });
   validators.set('descr',
     descr => {
       const type = typeof descr;
       const val = descr;
-      if (type !== 'string')
-        throw new TypeError(`${type}, val:${val} is not string`); 
+      const expectedType= 'string';
+
+      if (type !== expectedType)
+        throw new TypeError(JSON.stringify({
+          field_name: fieldName,
+          field_index: fieldNames[fieldName],
+          value_type: type,
+          value: val,
+          expected_type: expectedType
+        })); 
     });
   validators.set('I_O_type',
     I_O_type => {
       const type = typeof I_O_type;
       const val = I_O_type;
-      if (type !== 'number')
-        throw new TypeError(`${type}, val:${val} is not number`);
+      const expectedType = 'number';
+      if (type !== expectedType)
+        throw new TypeError(JSON.stringify({
+          field_name: fieldName,
+          field_index: fieldNames[fieldName],
+          value_type: type,
+          value: val,
+          expected_type: expectedType
+        })); 
       if (val < 0 || val > 1)
-        throw new TypeError(`${type}, val:${val} is not 1 or 0`); 
+        throw new TypeError(
+          `In field ${fieldNames['I_O_type']} ${type}, val:${val} is not 1 or 0`); 
     });
   validators.set('value',
     value => {
       const type = typeof value;
       const val = value;
-      if (type !== 'number')
-        throw new TypeError(`${type}, val:${val} is not number`);
+      const expectedType = 'number';
+      if (type !== expectedType)
+        throw new TypeError(JSON.stringify({
+          field_name: fieldName,
+          field_index: fieldNames[fieldName],
+          value_type: type,
+          value: val,
+          expected_type: expectedType
+        })); 
     });
 
   // validate record (row)
   for (const fieldName in fieldNames){
     const i = fieldNames[fieldName];
+    const val = record[i];
     if ( ! validators.has(fieldName))
       throw new ReferenceError(`Validator function not set for field ${fieldName}`);
-    validators.get(fieldName)(record[i]);
+    validators.get(fieldName)(val, fieldName);
   }
   
 } // function validateRecord END
@@ -1258,14 +1689,14 @@ function getFieldNames(firstRow){
   return fieldNames;
 }
 
-function getRecords(rawDataSheet){
+function getRecords(rawDataSheet, v, log){
   const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
 
-  const inspectRange = rawDataSheet.getRange('A1:Z');
-  const rangeValues = inspectRange.getValues();
+  const dataRange = rawDataSheet.getRange('A1:Z');
+  const rangeValues = dataRange.getValues();
   const rowCount = rangeValues.length;
-  v>1&& log(`Records in ${rawDataSheet.getName()}: ${rowCount}`);
+  v(1)&& log(`Records in ${rawDataSheet.getName()}: ${rowCount}`);
 
   const records = new Map();
 
@@ -1294,6 +1725,11 @@ function getRecords(rawDataSheet){
   return records;
 } // function getRecords END
 
+const libScopeVar = '_libscopevar';
+function dummy_func(ceva){
+  return ceva + libScopeVar + fromMain;
+}
+
 library.set('settings', Settings);
 library.set('renderReport', renderReport);
 library.set('importData', importData);
@@ -1301,12 +1737,14 @@ library.set('cleanRawData', cleanRawData);
 library.set('validateRecord', validateRecord);
 library.set('getFieldNames', getFieldNames);
 library.set('getRecords', getRecords);
+library.set('FieldValidator', FieldValidator);
+library.set('Log', Log);
+library.set('argumentsValidator', argumentsValidator);
+library.set('getType', getType);
+library.set('dummy_func', dummy_func);
 
 // returns required function or class
 return library.get(required);
 } // function libraryGet END
-
-} // main END
-
 
 
