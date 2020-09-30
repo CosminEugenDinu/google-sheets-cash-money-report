@@ -1153,68 +1153,101 @@ function importData(
  * @param {Sheet} rawDataSheet
  */
 function cleanRawData(fromDate, toDate, company, rawDataSheet){
-  const messages = new Map();
-
   //const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
+  const FieldValidator = libraryGet('FieldValidator');
+  const getType = libraryGet('getType');
 
-  const inspectRange = rawDataSheet.getRange('A1:Z');
-  const values = inspectRange.getValues();
+  const addMessage = message => {
+    const messages = cleanRawData.messages;
+    if (messages.has(message)) 
+      messages.get(message)[0] += 1;
+    else messages.set(message,[1]);
+    };
+
+  const dataRange = rawDataSheet.getRange('A1:Z');
+  const values = dataRange.getValues();
   const rowCount = values.length;
 
   const fieldNames = getFieldNames(values[0]);
-
-/*
-  const clean = (row, row_i) => {
-    for (let i=0; i<row.length; i++){
-
-      const col_i = i + 1;
-      const origVal = row[i];
-
-      try {
-        validators[i](row[i]);
-      } catch (e) {
-        // if ref is not string
-        if (e.message.match(/.*\sis\snot\sstring/)){
-          const newVal = `${row[i]}`;
-          const cell = range.getCell(row_i+1,col_i);
-          cell.setValue(newVal);
-          cell.setFontColor('red');
-          // throw new Error(`Changed from ${origVal} to ${cell.getValue()}, row_i:${row_i}, col_i:${col_i}`);
-          v(0)&& log(`Changed from ${origVal} to ${cell.getValue()}, row_i:${row_i}, col_i:${col_i}`);
-        }
-        if (e.message.match(/.*\sis\snot\snumber/)){
-          const cell = range.getCell(row_i+1,col_i);
-          cell.setBackground('pink');
-          throw new Error(`Sheet_row:${row_i+2},col_i:${col_i},val:${e.message}`);
-        }
-      }
-    }
-  };
-  const cleanRecords = () => {
-    for (let i=1; i<rangeValues.length; i++){
-      const row = rangeValues[i];
-      clean(row, i);
-    }
-    v(0)&& log('All records are cleaned.');
-  };
-*/
-
-  for (let i=1; i<values.length; i++){
-    // sheet row number
-    const rangeRowNum = i + 1;
-    const row = values[i];
-    try {
-      validate(row, fieldNames);
-    } catch(e) {
-      throw new Error('ceva from clean ' + e.message);
-    }
-    if (i === 3) break;
-
+  
+  // field descriptions
+  const validator = new FieldValidator();
+  for (const fieldName in fieldNames){
+    const fieldIndex = fieldNames[fieldName];
+    if (fieldName === 'date')
+      validator.setField(fieldName,fieldIndex,'Date');
+    else if (fieldName === 'ref')
+      validator.setField(fieldName,fieldIndex,'string');
+    else if (fieldName === 'doc_type')
+      validator.setField(fieldName,fieldIndex,'string');
+    else if (fieldName === 'descr')
+      validator.setField(fieldName,fieldIndex,'string');
+    else if (fieldName === 'I_O_type')
+      validator.setField(fieldName,fieldIndex,'number',0,1);
+    else if (fieldName === 'value')
+      validator.setField(fieldName,fieldIndex,'number');
+    else
+      throw new Error(`Unknown fieldName ${fieldName}`);
   }
 
+  const convertType = (recordVal, newType) => {
+
+    const currentType = getType(recordVal);
+    if (currentType === newType)
+      return recordVal;
+    
+    const typeConstructors = new Map();
+    typeConstructors.set('number', Number);
+    typeConstructors.set('string', JSON.stringify);
+    typeConstructors.set('Date', dateLike => new Date(dateLike));
+
+    try {
+      const converted = typeConstructors.get(newType)(recordVal);
+      return converted;
+    } catch(e) {
+      // if we got here, it means that type of record value was not converted
+      const err = new Error('Type not converted');
+      err.method = 'convertType';
+      err.recordVal = recordVal;
+      err.currentType = currentType;
+      err.expectedType = newType;
+      err.orginalError = e;
+      throw err;
+    }
+  };
+
+  let row_i = 0;
+  while(++row_i < rowCount){
+    const record = values[row_i];
+    // validation begin
+    for (const fieldName in fieldNames){
+      // fieldIndex should correspond with index of value from record
+      const fieldIndex = fieldNames[fieldName]; 
+      const testValue = record[fieldIndex];
+      try {
+        validator.validate(fieldName,testValue); 
+      } catch(e) {
+        if (getType(e) === 'TypeError'){
+          // try to convert according with field type (e.expectedType)
+          const converted = convertType(testValue, e.expectedType);
+          // validate again, if not thows then is a correct value/type
+          validator.validate(fieldName, converted);
+
+          addMessage(`converted {${getType(testValue)}} ${testValue} `+
+          `to {${getType(converted)}} ${converted}`);
+
+          // write value again in record array
+          record[fieldIndex] = converted;
+        }
+        else throw e;
+      }
+    }
+  }
 
 } // procedure cleanRawData END
+cleanRawData.messages = new Map();
+
 
 /**
  * Arguments validator
@@ -1259,13 +1292,17 @@ function getType(obj){
     return 'null';
   if (obj === undefined)
     return 'undefined';
+  if (Object.is(obj, NaN))
+    return 'nan';
+  if (Object.is(obj, Boolean(obj)))
+    return 'boolean';
   if (typeof obj === 'object')
     // returns 'Object', 'Array', 'Map', 'Set', etc
     return obj.constructor.name;
   if (typeof obj === 'function')
     // returns 'Function'
     return obj.constructor.name;
-  // returns 'number', 'string', 'boolean'
+  // returns 'number', 'string'
   return typeof obj;
 }
 
@@ -1286,8 +1323,7 @@ class FieldValidator{
    */
   setField(fieldName, fieldIndex, fieldType, minValue, maxValue, exactValues){
     
-    const getType = libraryGet('getType');
-    const [setArgTypes, validateArgs] = libraryGet('argumentsValidator')();
+    const [setArgTypes, validateArgs] = argumentsValidator();
 
     // number of actual parameters
     // last undefined actual parameters are excluded
@@ -1356,8 +1392,7 @@ class FieldValidator{
    * @param {*} testValue
    */
   validate(fieldName, testValue){
-    const [setArgTypes, validateArgs] = libraryGet('argumentsValidator')();
-    const getType = libraryGet('getType');
+    const [setArgTypes, validateArgs] = argumentsValidator();
     // validate arguments
     setArgTypes('string', getType(testValue));
     validateArgs(...arguments);
@@ -1387,12 +1422,22 @@ class FieldValidator{
     }
 
     // test for value
+    if(field.get('type') === 'Date'){
+      // explicit test for invalid date
+      if (Object.is(testValue.getTime(), NaN)){
+        const err = new ValueError('Invalid Date Value');
+        err.fieldName = fieldName;
+        err.expectedValue = new Date();
+        err.currentValue = testValue;
+        throw err;
+      }
+    }
     if (field.has('minValue')){
       if (testValue < field.get('minValue')){
         const err = new ValueError('Value less than minValue');
         err.fieldName = fieldName;
         err.expectedValue = `>= ${field.get('minValue')}`;
-        err.currentValue = testValue;
+        err.currentValue = `${testValue}`;
         throw err;
       }
     }
@@ -1556,8 +1601,8 @@ function getRecords(rawDataSheet, v, log){
   const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
 
-  const inspectRange = rawDataSheet.getRange('A1:Z');
-  const rangeValues = inspectRange.getValues();
+  const dataRange = rawDataSheet.getRange('A1:Z');
+  const rangeValues = dataRange.getValues();
   const rowCount = rangeValues.length;
   v(1)&& log(`Records in ${rawDataSheet.getName()}: ${rowCount}`);
 

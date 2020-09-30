@@ -316,7 +316,7 @@ tests.set('cleanRawData', () => {
     [
     // wrong date type
     ['2015,1,26', 'ref6', 'docType6', 'descr6', 0, 26],
-    [new Date(2015,1,26), 'ref6', 'docType6', 'descr6', 0, 26],
+    [new Date('2015,1,26'), 'ref6', 'docType6', 'descr6', 0, 26],
     ],
   ]){
     // mocks
@@ -333,7 +333,7 @@ tests.set('cleanRawData', () => {
     console.log(cleanRawData.messages);
 
     // now values should be cleaned
-    //assert.deepStrictEqual(values[1], correct_case);
+    assert.deepStrictEqual(values[1], correct_case);
   }
 
   for (const throwingCase of [
@@ -384,5 +384,5 @@ tests.get('getType')();
 tests.get('argumentsValidator')();
 tests.get('FieldValidator')();
 tests.get('validateRecord')();
-//tests.get('cleanRawData')();
+tests.get('cleanRawData')();
 
