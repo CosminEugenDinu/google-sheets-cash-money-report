@@ -328,7 +328,8 @@ tests.set('cleanRawData', () => {
     const Range = {
       getValues(){return values;},
       setValues(newValues){values = newValues;}};
-    const rawDataSheet = {getRange(str){return Range;}};
+    const rawDataSheet = {
+      getRange(str){return Range;},getName(){return 'sheet_name'}};
 
     cleanRawData(fromDate, toDate, company, rawDataSheet);
     console.log(cleanRawData.messages);
@@ -357,23 +358,28 @@ tests.set('cleanRawData', () => {
     const Range = {
       getValues(){return values;},
       setValues(newValues){values = newValues;}};
-    const rawDataSheet = {getRange(str){return Range;}};
+    const rawDataSheet = {
+      getRange(str){return Range;},getName(){return 'sheet_name'}};
 
     assert.throws(()=>{
       cleanRawData(fromDate, toDate, company, rawDataSheet);
     },{name:'ValueError'},`should throw ValueError on case ${throwingCase}`);
     console.log(cleanRawData.messages);
   }
-
+  // 10 empty rows (if encountered) is considered end of data set
+  const twelveEmptyRows = Array(12).fill(Array(6));
+  const fiveEmptyRows = Array(5).fill(Array(6));
   for (const [unsortedDuplicates, sortedWithoutDuplicates] of [
     [
       [
       ['date','ref','doc_type','descr','I_O_type','value'],
       [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', 0, 26],
       [new Date(2015,1,28), 'ref8', 'docType8', 'descr8', 0, 26],
+      ...fiveEmptyRows,
       [new Date(2015,1,28), 'ref8', 'docType8', 'descr7', 0, 26],
       [new Date(2015,1,27), 'ref8', 'docType8', 'descr8', 0, 26],
       [new Date(2015,1,27), 'ref8', 'docType8', 'descr8', 0, 26],
+      ...twelveEmptyRows,
       ],
       [
       ['date','ref','doc_type','descr','I_O_type','value'],
@@ -382,6 +388,7 @@ tests.set('cleanRawData', () => {
       [new Date(2015,1,28), 'ref8', 'docType8', 'descr7', 0, 26],
       [ , , , , , ,],
       [ , , , , , ,],
+      ...twelveEmptyRows,
       ]
     ],
   ]) {
@@ -393,7 +400,8 @@ tests.set('cleanRawData', () => {
     const Range = {
       getValues(){return values;},
       setValues(newValues){values = newValues;}};
-    const rawDataSheet = {getRange(str){return Range;}};
+    const rawDataSheet = {
+      getRange(str){return Range;},getName(){return 'sheet_name'}};
 
     cleanRawData(fromDate, toDate, company, rawDataSheet);
 
