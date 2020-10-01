@@ -7,6 +7,7 @@ const Code = rewire('../../report_generator/Code.js');
 
 const libraryGet = Code.__get__('libraryGet');
 
+const addMessages = libraryGet('addMessages');
 const Log = libraryGet('Log');
 const getType = libraryGet('getType');
 const argumentsValidator = libraryGet('argumentsValidator');
@@ -15,6 +16,25 @@ const validateRecord = libraryGet('validateRecord');
 const cleanRawData = libraryGet('cleanRawData');
 
 const tests = new Map();
+
+tests.set('addMessages', () => {
+
+  function someProcedure(...args){
+    const addMessage = addMessages(someProcedure);
+    addMessage(`I was called with first arg: ${args[0]}`);
+    // do some work
+    addMessage('I\'m done');
+    return;
+  }
+
+  someProcedure('arg1');
+
+  expectedMessages = new Map();
+  expectedMessages.set(`I was called with first arg: arg1`,[1]);
+  expectedMessages.set('I\'m done',[1]);
+
+  assert.deepStrictEqual(someProcedure.messages, expectedMessages); 
+});
 
 tests.set('Log', () => {
   // mocks
@@ -407,9 +427,11 @@ tests.set('cleanRawData', () => {
 });
 
 
+tests.get('addMessages')();
 tests.get('Log')();
 tests.get('getType')();
 tests.get('argumentsValidator')();
 tests.get('FieldValidator')();
 tests.get('validateRecord')();
 tests.get('cleanRawData')();
+
