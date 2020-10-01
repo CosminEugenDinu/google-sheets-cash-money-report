@@ -471,6 +471,29 @@ function libraryGet(required){
 const library = new Map();
 
 /**
+ * Takes function object, adds own property 'messages',
+ * and returns closure (used to add debugging messages).
+ *
+ * @param {function} procedure
+ *
+ * @return {function} addMessage
+ * @prop {Map} procedure.messages
+ */
+function addMessages(procedure){
+  if (typeof procedure !== 'function')
+    throw new TypeError(`${procedure.name} is not function`);
+
+  procedure.messages = new Map();
+
+  const addMessage = message =>
+    procedure.messages.has(message) ?
+      ++procedure.messages.get(message)[0] :
+      procedure.messages.set(message,[1]);
+
+  return addMessage;
+}
+
+/**
  * Logging function - logs to specified cell
  *      - instantiate with const log = Log(sheet, [x,y,xOffset,yOffset);
  *      - usage: log("Welcome to log console!");
@@ -1723,6 +1746,7 @@ library.set('validateRecord', validateRecord);
 library.set('getFieldNames', getFieldNames);
 library.set('getRecords', getRecords);
 library.set('FieldValidator', FieldValidator);
+library.set('addMessages', addMessages);
 library.set('Log', Log);
 library.set('argumentsValidator', argumentsValidator);
 library.set('getType', getType);
