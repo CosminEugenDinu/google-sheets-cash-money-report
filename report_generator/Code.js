@@ -1011,7 +1011,7 @@ function renderReport(
        *   render every dayReport to sheet according with date,
        *   and DONE
        */
-
+          
       // delete existing sheets except first
       v>1 && addMessage(`Deleting existing report sheets except first`);
       targetSpreadsheet.getSheets().forEach(sheet =>{
@@ -1023,7 +1023,8 @@ function renderReport(
       }
       );
       const dates = datesBetween(fromDate, toDate);
-      v>1 && addMessages(`Rendering reports between ${fromDate.toLocaleDateString('ro-RO')} and ${toDate.toLocaleDateString('ro-RO')}`);
+
+      v>1 && addMessage(`Rendering reports between ${fromDate.toLocaleDateString('ro-RO')} and ${toDate.toLocaleDateString('ro-RO')}`);
 
       let sheetIndex = 1
       for (const date of dates){
