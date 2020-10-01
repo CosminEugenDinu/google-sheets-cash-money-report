@@ -484,23 +484,19 @@ tests.set('getRecords', () => {
     const row = values[row_i];
     // exclude empty row (assuming first undefined value)
     if (row[0]===undefined) continue;
+    const date = row[3];
+    const dateKey = date.toJSON();
+
     const record = new Map(); // {Map} record
     for (const fieldName in fieldNames){
       const fieldIndex = fieldNames[fieldName];
-      record.set(fieldName,row[fieldIndex]);
+      record.set(fieldName,fieldName==='date'?dateKey:row[fieldIndex]);
     }
-    const date = row[3];
-    const dateKey = date.toJSON();
     if (records.has(dateKey)) records.get(dateKey).push(record)
     else records.set(dateKey, [record]); 
   }
 
-  try{
-    getRecords(rawDataSheet, fieldDescriptors);
-  } catch(e){
-    console.log('got: ', e);
-    console.log(JSON.stringify(e));
-  }
+  assert.deepStrictEqual(getRecords(rawDataSheet, fieldDescriptors), records);
 });
 
 tests.get('addMessages')();

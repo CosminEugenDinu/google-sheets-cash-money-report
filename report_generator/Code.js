@@ -1740,6 +1740,17 @@ function getRecords(rawDataSheet, fieldDescriptors){
   const FieldValidator = libraryGet('FieldValidator');
   const addMessages = libraryGet('addMessages');
 
+  // add default value to fieldDescriptors
+  if (fieldDescriptors===undefined)
+    fieldDescriptors = [
+      {fieldName:"date",fieldType:"Date"},
+      {fieldName:"ref",fieldType:"string"},
+      {fieldName:"doc_type",fieldType:"string"},
+      {fieldName:"descr",fieldType:"string"},
+      {fieldName:"I_O_type",fieldType:"number",minValue:0,maxValue:1},
+      {fieldName:"value",fieldType:"number"}
+    ];
+
   // initialize debug messaging
   const thisProcedure = getRecords;
   const addMessage = addMessages(thisProcedure); // adds prop {Map} messages
