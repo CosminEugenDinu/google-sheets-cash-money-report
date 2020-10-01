@@ -25,7 +25,7 @@ const interfaceSheet = repGenSprSheet.getSheetByName(INTERFACE_SHEET_NAME);
 const settingsSheet = repGenSprSheet.getSheetByName(SETTINGS_SHEET_NAME);
 
 const verbosity = interfaceSheet.getSheetValues(8,5,1,1)[0][0];
-// v=0 - critical, v=1 - informal, v=2 - too verbose
+// v=0 - critical, v=1 - informal, v=2 - too verbose 
 // const v = +verbosity;
 // instantiate log function
 const [v, log] = Log(interfaceSheet, [10,5], +verbosity);
@@ -119,7 +119,7 @@ if (procedure==='importData'){
 //---------------------------------------------------------------------------------
 
 if (procedure === 'cleanRawData'){
-  v(0)&& log('Procedure cleanRawData begin');
+  v(1)&& log('Procedure cleanRawData begin');
 
   const args = [fromDate, toDate, company, rawDataSheet];
   const messages = [];
@@ -128,12 +128,12 @@ if (procedure === 'cleanRawData'){
     const cleanRawData = libraryGet(procedure);
     cleanRawData.verbosity = verbosity;
     cleanRawData(...args);
-    for (const [mes, count] of cleanRawData.messages)
-      log(count, mes);
+    if (cleanRawData.messages)
+      for (const [mes, count] of cleanRawData.messages) log(count, mes);
   } catch(e){
     throw new Error(`Procedure ${procedure} failed with:\n${e.message}\n${JSON.stringify(e)}`);
   }
-  v(0)&& log('Procedure cleanRawData END');
+  v(1)&& log('Procedure cleanRawData END');
 }
 
 } // main END
@@ -1175,6 +1175,7 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
       thisMethod.messages.get(message)[0] += 1;
     else thisMethod.messages.set(message,[1]);
     };
+  addMessage(-1, `very important message`);
   
   addMessage(2, `values retrieved from sheet ${rawDataSheet.getName()}`);
 
