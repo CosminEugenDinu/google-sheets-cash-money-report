@@ -400,6 +400,7 @@ tests.set('cleanRawData', () => {
       ...fiveEmptyRows,
       [new Date(2015,1,28), 'ref8', 'docType8', 'descr7', 0, 26],
       [new Date(2015,1,27), 'ref8', 'docType8', 'descr8', 0, 26],
+      ...fiveEmptyRows,
       [new Date(2015,1,27), 'ref8', 'docType8', 'descr8', 0, 26],
       ...twelveEmptyRows,
       ],
@@ -410,6 +411,7 @@ tests.set('cleanRawData', () => {
       [new Date(2015,1,28), 'ref8', 'docType8', 'descr7', 0, 26],
       [ , , , , , ,],
       [ , , , , , ,],
+      ...fiveEmptyRows,
       ...fiveEmptyRows,
       ...twelveEmptyRows,
       ]
@@ -472,7 +474,6 @@ tests.set('getRecords', () => {
   const fieldNames = {
     'ref':0,'date':3,'doc_type':4,'descr':5,'I_O_type':7,'value':9
   };
-  values[0].forEach((fn,i)=>console.log(fn,i));
   
   // expected return from procedure getRecords
   const records = new Map();
@@ -497,8 +498,8 @@ tests.set('getRecords', () => {
   try{
     getRecords(rawDataSheet, fieldDescriptors);
   } catch(e){
-  console.log('getRecords called');
-  console.log('got: ', e);
+    console.log('got: ', e);
+    console.log(JSON.stringify(e));
   }
 });
 

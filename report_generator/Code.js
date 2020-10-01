@@ -1277,14 +1277,14 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
       v>1 && addMessage(`found ${emptyRowCount} empty rows, so break`); 
       break;
     }
-
     const rowIsEmpty = record.reduce((isEmpty,val)=>{
       return [NaN,'',null,undefined].includes(val) ? isEmpty : false;
     }, true);
-
     if (rowIsEmpty){ ++emptyRowCount;
       continue;
     }
+    // if got here, then emptyRowCount < 10, so reset
+    emptyRowCount = 0;
 
     // delete all values from fields with indexes that are not in fieldIndexes
     record.forEach((v, i) => {
@@ -1532,8 +1532,11 @@ class FieldValidator{
         super(msg);
         this.name = 'NotFoundError';}}
 
-    if ( ! this._fieldNames.has(fieldName))
-      throw new NotFoundError('Field not found');
+    if ( ! this._fieldNames.has(fieldName)){
+      const err = new NotFoundError('Field not found');
+      err.fieldName = fieldName;
+      throw err;
+    }
 
     const field = this._fieldNames.get(fieldName);
 
@@ -1749,10 +1752,12 @@ function getRecords(rawDataSheet, fieldDescriptors){
   
   // these are the names found on first row of sheet;
   const fieldNames = getFieldNames(values[0]);
+  const expectedFieldNames = [];
 
   const validator = new FieldValidator();
   for (const fieldDescr of fieldDescriptors){
     const fieldName = fieldDescr.fieldName;
+    expectedFieldNames.push(fieldName);
     if (fieldName in fieldNames){
       const fieldIndex = fieldNames[fieldName];
 
@@ -1769,14 +1774,30 @@ function getRecords(rawDataSheet, fieldDescriptors){
   }
 
   const records = new Map();
+  let emptyRowCount = 0;
 
   for (let row_i=1; row_i < values.length; row_i++){
     const row = values[row_i];
+
+    // if 10 empty records are encountered then is end of data set
+    if (emptyRowCount > 9){
+      v>1 && addMessage(`found ${emptyRowCount} empty rows, so break`); 
+      break;
+    }
+    const rowIsEmpty = row.reduce((isEmpty,val)=>{
+      return [NaN,'',null,undefined].includes(val) ? isEmpty : false;
+    }, true);
+    if (rowIsEmpty){ ++emptyRowCount;
+      continue;
+    }
+    // if got here, then emptyRowCount < 10, so reset
+    emptyRowCount = 0;
+
     const record = new Map();
 
     let dateKey = '';
 
-    for (const fieldName in fieldNames){
+    for (const fieldName of expectedFieldNames){
       const field_i = fieldNames[fieldName];
       const thisValue = row[field_i];
 
