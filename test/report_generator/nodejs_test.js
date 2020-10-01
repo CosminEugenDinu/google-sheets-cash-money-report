@@ -16,6 +16,8 @@ const validateRecord = libraryGet('validateRecord');
 const cleanRawData = libraryGet('cleanRawData');
 const renderReport = libraryGet('renderReport');
 
+const getRecords = libraryGet('getRecords');
+
 const tests = new Map();
 
 tests.set('addMessages', () => {
@@ -143,8 +145,10 @@ tests.set('FieldValidator', () => {
         ['nums',0,'number',null,2],
         ['nums',0,'number',0,null],
         ['nums',0,'number',0,2],
+        ['nums',0,'number',0,2,null],
         ['nums',0,'number',null,null],
-        ['nums',0,'number',null,null,exactIntValues]
+        ['nums',0,'number',null,null,null],
+        ['nums',0,'number',null,null,exactIntValues],
       ],
       wrongNumOfArgs: [
         [],
@@ -161,6 +165,7 @@ tests.set('FieldValidator', () => {
         ['nums',0,'number',null,'str',exactIntValues],
         ['nums',0,'number','str',null,exactIntValues],
         ['nums',0,'number',null,null,exactStrValues],
+        ['nums',0,'number',1,3,exactIntValues],
       ],
     },
     validate:{
@@ -184,7 +189,7 @@ tests.set('FieldValidator', () => {
   for (const args of testArguments.setField.correctArgs){
     assert.doesNotThrow(()=>{
       new FieldValidator().setField(...args); 
-    })
+    },JSON.stringify(args))
   }
   // test wrong number of arguments
   for (const args of testArguments.setField.wrongNumOfArgs){
@@ -435,6 +440,67 @@ tests.set('renderReport', () => {
   //console.log(renderReport.messages);
 });
 
+tests.set('getRecords', () => {
+  // verbosity
+  const v = 2;
+
+  const fieldDescriptors = [
+    {fieldName:"date",fieldType:"Date"},
+    {fieldName:"ref",fieldType:"string"},
+    {fieldName:"doc_type",fieldType:"string"},
+    {fieldName:"descr",fieldType:"string"},
+    {fieldName:"I_O_type",fieldType:"number",minValue:0,maxValue:1},
+    {fieldName:"value",fieldType:"number"}
+  ];
+
+  const twelveEmptyRows = Array(12).fill(Array(12));
+  const fiveEmptyRows = Array(5).fill(Array(12));
+  let values = [
+    ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
+    ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
+    ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
+    ...fiveEmptyRows,
+    ['ref8',,,new Date(2015,1,28),'docType8','descr7','unknown',0,,26,,,],
+    ['ref8',,,new Date(2016,1,27),'docType8','descr8','unknown',0,,26,,,],
+    ['ref8',,,new Date(2016,1,27),'docType8','descr8','unknown',0,,26,,,],
+    ...twelveEmptyRows,
+    ];
+  // mocks
+  const Range = {getValues(){return values;}};
+  const rawDataSheet = {getRange(str){return Range;},getName(){return 'sheetName';}};
+  
+  const fieldNames = {
+    'ref':0,'date':3,'doc_type':4,'descr':5,'I_O_type':7,'value':9
+  };
+  values[0].forEach((fn,i)=>console.log(fn,i));
+  
+  // expected return from procedure getRecords
+  const records = new Map();
+  // for every unique or duplicate date.toJSON set and array of {Map} records
+
+  let row_i = 0;
+  while(++row_i < values.length){
+    const row = values[row_i];
+    // exclude empty row (assuming first undefined value)
+    if (row[0]===undefined) continue;
+    const record = new Map(); // {Map} record
+    for (const fieldName in fieldNames){
+      const fieldIndex = fieldNames[fieldName];
+      record.set(fieldName,row[fieldIndex]);
+    }
+    const date = row[3];
+    const dateKey = date.toJSON();
+    if (records.has(dateKey)) records.get(dateKey).push(record)
+    else records.set(dateKey, [record]); 
+  }
+
+  try{
+    getRecords(rawDataSheet, fieldDescriptors);
+  } catch(e){
+  console.log('getRecords called');
+  console.log('got: ', e);
+  }
+});
 
 tests.get('addMessages')();
 tests.get('Log')();
@@ -444,4 +510,4 @@ tests.get('FieldValidator')();
 tests.get('validateRecord')();
 tests.get('cleanRawData')();
 tests.get('renderReport')();
-
+tests.get('getRecords')();

@@ -70,7 +70,7 @@ if (procedure==='renderReport'){
   let args;
   try{
     getRecords.verbosity = verbosity;
-    //const dataRecords = getRecords(rawDataSheet);
+    const dataRecords = getRecords(rawDataSheet);
     const messages = getRecords.messages;
     if (messages) for (let [msg, count] of messages){ log(count, msg); }
 
@@ -1459,12 +1459,22 @@ class FieldValidator{
       const minValueType = getType(minValue)==='null'?'null':fieldType;
       setArgTypes('string','number','string', minValueType);
     } else if (argsLength === 5){
-      const minValueType = getType(minValue)==='null'?'null':fieldType;
-      const maxValueType = getType(maxValue)==='null'?'null':fieldType;
+      const minValueType = getType(minValue)==='null' ?
+        'null':fieldType;
+      const maxValueType = getType(maxValue)==='null' ?
+        'null':fieldType;
       setArgTypes('string','number','string', minValueType, maxValueType);
-    } else if (argsLength === 6)
-      setArgTypes('string','number','string', 'null', 'null', 'Set');
-
+    } else if (argsLength === 6){
+      const minValueType = getType(minValue)==='null' ?
+        'null':fieldType;
+      const maxValueType = getType(maxValue)==='null' ?
+        'null':fieldType;
+      const typeOfLastArg = getType(exactValues)==='null' ?
+        'null':'Set';
+      const exactValuesType = (minValueType==='null' && maxValueType==='null') ?
+        typeOfLastArg :'null';
+      setArgTypes('string','number','string', minValueType, maxValueType, exactValuesType);
+    }
 
     //setArgTypes('string','number','string',fieldType,fieldType,'Set');
     validateArgs(...arguments);
@@ -1484,7 +1494,7 @@ class FieldValidator{
     if (maxValue !== null && maxValue !== undefined && exactValues === undefined)
       field.set('maxValue', maxValue);
     // throw if type of exactValues is not the same as fieldType
-    if (exactValues !== undefined){
+    if (exactValues !== null && exactValues !== undefined){
       for (const exactVal of exactValues.keys()){
         if (getType(exactVal) !== fieldType){
           const err = new TypeError('Invalid field exactType');
@@ -1713,9 +1723,18 @@ function getFieldNames(firstRow){
   return fieldNames;
 }
 
-function getRecords(rawDataSheet){
-  const validate = libraryGet('validateRecord');
+/**
+ * @param {Sheet} rawDataSheet
+ * @param {Object[]} fieldDescriptors
+ * 
+ * @return {Map} records - {string} key date.toJSON(), {Array} values
+ * 
+ * returns something like ....
+ */
+function getRecords(rawDataSheet, fieldDescriptors){
+  //const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
+  const FieldValidator = libraryGet('FieldValidator');
   const addMessages = libraryGet('addMessages');
 
   // initialize debug messaging
@@ -1724,33 +1743,60 @@ function getRecords(rawDataSheet){
   // @prop {number} verbosity could be added at procedure call
   const v = thisProcedure.verbosity ? thisProcedure.verbosity : 0;
 
-  const dataRange = rawDataSheet.getRange('A1:Z');
-  const rangeValues = dataRange.getValues();
-  const rowCount = rangeValues.length;
-  v>0 && addMessage(`Records in ${rawDataSheet.getName()}: ${rowCount}`);
+  const range = rawDataSheet.getRange('A1:Z');
+  const values = range.getValues();
+  v>0 && addMessage(`Records in ${rawDataSheet.getName()}: ${values.length}`);
+  
+  // these are the names found on first row of sheet;
+  const fieldNames = getFieldNames(values[0]);
+
+  const validator = new FieldValidator();
+  for (const fieldDescr of fieldDescriptors){
+    const fieldName = fieldDescr.fieldName;
+    if (fieldName in fieldNames){
+      const fieldIndex = fieldNames[fieldName];
+
+      validator.setField(
+        fieldName, fieldIndex, fieldDescr.fieldType,
+        fieldDescr.minValue || null,
+        fieldDescr.maxValue || null,
+        fieldDescr.exactValues || null);
+    } else {
+      const err = new TypeError('Not found');
+      err.fieldName = fieldName;
+      throw err;
+    }
+  }
 
   const records = new Map();
 
-  for (let i=1; i<rangeValues.length; i++){
-    const row = rangeValues[i];
-    try {
-      validate(row, getFieldNames(rangeValues[0]));
-    } catch(e){
-      throw new TypeError(
-        `In getRecords(${rawDataSheet.getName()}), row:${i+1}, got: ${e.message}`
-        ); 
-    }
+  for (let row_i=1; row_i < values.length; row_i++){
+    const row = values[row_i];
     const record = new Map();
-    const date = row[0].toJSON();
-    record.set('date', date);
-    record.set('ref', row[1]);
-    record.set('doc_type', row[2]);
-    record.set('descr', row[3]);
-    record.set('I_O_type', row[4]);
-    record.set('value', row[5]);
+
+    let dateKey = '';
+
+    for (const fieldName in fieldNames){
+      const field_i = fieldNames[fieldName];
+      const thisValue = row[field_i];
+
+      try { validator.validate(fieldName, thisValue);}
+      catch(err){
+        err.sheetName = rawDataSheet.getName();
+        err.row = row_i + 1;
+        err.thisProcedureName = thisProcedure.name;
+        throw err;
+      }
+      if (fieldName==='date'){
+        dateKey = thisValue.toJSON();
+        record.set(fieldName, dateKey); 
+      } else {
+        record.set(fieldName, thisValue); 
+      }
+    }
     // a record will be retrieved by date
-    records.get(date) && records.get(date).push(record)
-      || records.set(date, [record]);
+    records.has(dateKey) && records.get(dateKey).push(record)
+      || records.set(dateKey, [record]);
   }
 
   return records;
