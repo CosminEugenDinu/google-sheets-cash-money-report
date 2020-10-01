@@ -43,11 +43,6 @@ tests.set('Log', () => {
   log(messages[0]);
   assert.equal(cellValue[0], '> '+messages.join('\n> '));
 
-  cellValue[0] = undefined;
-  log = Log(sheet, location);
-  messages = ['cva'];
-  log(messages[0]);
-  assert.equal(cellValue[0], '> '+messages.join('\n> '));
 });
 
 tests.set('getType', () => {
@@ -412,10 +407,8 @@ tests.set('cleanRawData', () => {
 
 
 tests.get('Log')();
-/*
 tests.get('getType')();
 tests.get('argumentsValidator')();
 tests.get('FieldValidator')();
 tests.get('validateRecord')();
 tests.get('cleanRawData')();
-*/
