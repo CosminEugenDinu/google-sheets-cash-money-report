@@ -26,9 +26,10 @@ const settingsSheet = repGenSprSheet.getSheetByName(SETTINGS_SHEET_NAME);
 
 const verbosity = interfaceSheet.getSheetValues(8,5,1,1)[0][0];
 // v=0 - critical, v=1 - informal, v=2 - too verbose 
-// const v = +verbosity;
+// function to check some level against verbosity (which is set on interface)
+const v = level => verbosity === level; 
 // instantiate log function
-const [v, log] = Log(interfaceSheet, [10,5], +verbosity);
+const log = Log(interfaceSheet, [10,5,8,3]);
 
 const settings = new Settings(settingsSheet, 50, 1000);
 
@@ -68,11 +69,11 @@ const rawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SU
 if (procedure==='renderReport'){
   let args;
   try{
-    const dataRecords = getRecords(rawDataSheet, v, log);
+    const dataRecords = getRecords(rawDataSheet);
     const template = defaultTemplate();
     const targetSpreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
 
-    args = [fromDate, toDate, company, dataRecords, template, targetSpreadsheet, v, log];
+    args = [fromDate, toDate, company, dataRecords, template, targetSpreadsheet];
 
   } catch(e){
     throw new Error(
@@ -102,7 +103,7 @@ if (procedure==='importData'){
       sheet => sheet.getName() === company.get('alias')+RAWDATA_SHEET_SUFFIX
       );
 
-    args = [fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo, v, log];
+    args = [fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo];
 
   } catch(e){
     throw new Error(
@@ -129,7 +130,7 @@ if (procedure === 'cleanRawData'){
     cleanRawData.verbosity = verbosity;
     cleanRawData(...args);
     if (cleanRawData.messages)
-      for (const [mes, count] of cleanRawData.messages) log(count, mes);
+      for (const [mes, count] of cleanRawData.messages) v(0) && log(count, mes);
   } catch(e){
     throw new Error(`Procedure ${procedure} failed with:\n${e.message}\n${JSON.stringify(e)}`);
   }
@@ -159,7 +160,7 @@ function mergeDateRecords(records_1, records_2){
     let alsoInRecords_2 = false;
     for (const map2 of records_2)
       if (areTheSame(map1, map2)){
-         log(`Record ${Array.from(map1.values())} is duplicate, so skipped`); 
+         //log(`Record ${Array.from(map1.values())} is duplicate, so skipped`); 
         alsoInRecords_2 = true;
         break;
       }
@@ -192,7 +193,7 @@ function areTheSame(map_1, map_2){
  *      - {string} keys - dates (ISO 8601)
  *      - {Array} values - of {Map} records, like {'date'=>{Date}, 'ref'=>32, etc.} 
  */
-function searchRecords(spreadsheet, identifierPattern, v, log, rowLim=50, colLim=6){
+function searchRecords(spreadsheet, identifierPattern, rowLim=50, colLim=6){
   const records = new Map();
 
   // measurements
@@ -259,7 +260,7 @@ function searchRecords(spreadsheet, identifierPattern, v, log, rowLim=50, colLim
   }
 
 // log accumulated messages
-messages.forEach((vals, mess) => v(1) && log(mess, vals.length, JSON.stringify(vals)));
+//messages.forEach((vals, mess) => v(1) && log(mess, vals.length, JSON.stringify(vals)));
 return records;
 }
 
@@ -464,11 +465,6 @@ function defaultTemplate(){
 }
 
 
-
-
-
-
-
 function libraryGet(required){
 
 // library members dictionary
@@ -476,22 +472,17 @@ const library = new Map();
 
 /**
  * Logging function - logs to specified cell
- *      - instantiate with const [v, log] = Log(sheet, cellPos, defaultVerbosity);
- *      - usage: v(2)&& log("Welcome to log console!");
- *
+ *      - instantiate with const log = Log(sheet, [x,y,xOffset,yOffset);
+ *      - usage: log("Welcome to log console!");
  * @param {Sheet} sheet
- * @param {Array} cellPos - tuple array with cell position [x, y] - console output cell
- * @param {number} defaultVerbosity
+ * @param {number[]} location
  */
-function Log(sheet, cellPos, defaultVerbosity){
-  // default verbosity is set from UI
-  const _defaultVerbosity = defaultVerbosity;
-  let _currentVerbosity = 0;
+function Log(sheet, location){
 
   // clear console space
-  //sheet.getRange(...cellPos,8,3).clear();
-  sheet.getRange(...cellPos,8,3).clear();
-  const range = sheet.getRange(...cellPos,8,3).merge();
+  //sheet.getRange(...location).clear();
+  //const range = sheet.getRange(...cellPos,8,3).merge();
+  const range = sheet.getRange(...location).clear().merge();
   const cell = range.getCell(1,1);
   cell.setBackground("black");
   cell.setFontColor("white");
@@ -500,23 +491,18 @@ function Log(sheet, cellPos, defaultVerbosity){
   const _logs = [];
 
   const log = (...args) => {
-    if (_defaultVerbosity >= _currentVerbosity){
-      _logs.push(args.toString());
-      cell.setValue('> '+_logs.join('\n> '));
-    }
+    _logs.push(args.toString());
+    cell.setValue('> '+_logs.join('\n> '));
     // returns true to permit chaining like: log('something') && another_statement;
     return true;
   }
   
-  const setVerbosity = level => {
-    _currentVerbosity = level;
-    return _defaultVerbosity >= _currentVerbosity;
-  }
 
-  return [setVerbosity, log];
-  //return log;
+  //return [setVerbosity, log];
+  return log;
 }
-  
+
+
 class Settings{
   constructor(settingsSheet, rowLim, colLim){
     const range = settingsSheet.getRange(1,1,rowLim,colLim);
@@ -583,8 +569,6 @@ class Settings{
       throw new ReferenceError(`${fieldName} is not a field name`);
     return this._fields.get(fieldName);
   }
-  
-  
 } // class Settings END
 
 
@@ -594,7 +578,7 @@ function renderReport(
     company,
     dataRecords,
     template,
-    targetSpreadsheet, v, log){
+    targetSpreadsheet){
   v(0)&& log('Procedure renderReport begin');
 
   /**
@@ -990,7 +974,7 @@ function renderReport(
        */
 
       // delete existing sheets except first
-      v(2)&& log(`Deleting existing report sheets except first`);
+      //v(2)&& log(`Deleting existing report sheets except first`);
       targetSpreadsheet.getSheets().forEach(sheet =>{
         if (sheet.getIndex() === 1) 
           // cover sheet 
@@ -1000,7 +984,7 @@ function renderReport(
       }
       );
       const dates = datesBetween(fromDate, toDate);
-      v(2)&& log(`Rendering reports between ${fromDate.toLocaleDateString('ro-RO')} and ${toDate.toLocaleDateString('ro-RO')}`);
+      //v(2)&& log(`Rendering reports between ${fromDate.toLocaleDateString('ro-RO')} and ${toDate.toLocaleDateString('ro-RO')}`);
 
       let sheetIndex = 1
       for (const date of dates){
@@ -1009,7 +993,7 @@ function renderReport(
         const sheet = targetSpreadsheet.insertSheet(sheetIndex++);
         const dayReport = new DailyReport(date, company, dataRecords, this.balanceCalculator());
         dayReport.render(sheet, this.template);
-        v(2)&& log(`Day report ${new Date(date).toLocaleDateString('ro-RO')} rendered!`);
+        //v(2)&& log(`Day report ${new Date(date).toLocaleDateString('ro-RO')} rendered!`);
       }
 
       return;
@@ -1024,7 +1008,7 @@ function renderReport(
   report.render(targetSpreadsheet);
   //================================================================
 
-  v(2)&& log('Procedure renderReport END');
+  //v(2)&& log('Procedure renderReport END');
 } // renderReport END
 /**
  * Searches for company data records in provided links to standalone spreadsheets,
@@ -1040,9 +1024,9 @@ function importData(
     company,
     dataLinks,
     identifierPattern,
-    sheetToImportTo, v, log){
-  v(0)&& log('Procedure importData begin');
-  v(2)&& log(`Company alias: ${company.get('alias')}`);
+    sheetToImportTo){
+  //v(0)&& log('Procedure importData begin');
+  //v(2)&& log(`Company alias: ${company.get('alias')}`);
   const getRecords = libraryGet('getRecords');
 
   // tableName the prefix before '.' in field name, like tableName.fieldName
@@ -1058,7 +1042,7 @@ function importData(
           ids.push(sheetId);
           numOfEmpty = 0;
         } catch(e){
-          v(0)&& log(`${e}\nSeems that link:\n${link}\ndoes not match pattern.`);
+          //v(0)&& log(`${e}\nSeems that link:\n${link}\ndoes not match pattern.`);
         }
       else throw new ReferenceError('No spreadsheet link.');
     }
@@ -1073,45 +1057,45 @@ function importData(
         spreadsheets.push(spreadsheet);
         return spreadsheets;
       } catch(e){
-        v(0)&& log('When opening sheet with id\n', sheetId, '\ngot: ', e);
+        //v(0)&& log('When opening sheet with id\n', sheetId, '\ngot: ', e);
         return spreadsheets;
       }
     }, []
   );
 
   if ( ! srcSpreadsheets.length){
-    v(0)&& log('No source spreadsheets opened!'); 
+    //v(0)&& log('No source spreadsheets opened!'); 
     return 2;
   } else {
-    v(1)&& log(`Spreadsheets opened ${srcSpreadsheets.length}, [${srcSpreadsheets.map(ss => ss.getName())}]`);
+    //v(1)&& log(`Spreadsheets opened ${srcSpreadsheets.length}, [${srcSpreadsheets.map(ss => ss.getName())}]`);
   }
 
   const foundRecords = new Map(); 
   for (const sheet of srcSpreadsheets){
-    for (const [dateStr, record] of searchRecords(sheet, identifierPattern, v, log)){
+    for (const [dateStr, record] of searchRecords(sheet, identifierPattern)){
       foundRecords.set(dateStr, record);
     }
   }
 
-  if (!foundRecords.size)
-    v(1)&& log(`No records found in spreadsheet ${srcSpreadsheets[0].getName()}`);
-  else
-    v(2)&& log(`Found ${foundRecords.size} day-records in spreadsheets: [${srcSpreadsheets.map(ss => ss.getName())}]`);
+  //if (!foundRecords.size)
+    //v(1)&& log(`No records found in spreadsheet ${srcSpreadsheets[0].getName()}`);
+ // else
+    //v(2)&& log(`Found ${foundRecords.size} day-records in spreadsheets: [${srcSpreadsheets.map(ss => ss.getName())}]`);
 
   
   // retrieve existing records in raw data sheet
-  const existingRecords = getRecords(sheetToImportTo, v, log);
-  v(2)&& log(`${existingRecords.size} day-records exists in ${sheetToImportTo.getName()}`);
+  const existingRecords = getRecords(sheetToImportTo);
+  //v(2)&& log(`${existingRecords.size} day-records exists in ${sheetToImportTo.getName()}`);
 
   const dates = datesBetween(fromDate, toDate);
-  v(2)&& log(`Searching found-records between ${new Date(fromDate).toLocaleDateString('ro-RO')} and ${new Date(toDate).toLocaleDateString('ro-RO')}...`);
+  //v(2)&& log(`Searching found-records between ${new Date(fromDate).toLocaleDateString('ro-RO')} and ${new Date(toDate).toLocaleDateString('ro-RO')}...`);
 
   for (const dateStr of dates){
     const foundDateRecords = foundRecords.get(dateStr);
     const existingDateRecords = existingRecords.get(dateStr);
     if (foundDateRecords && existingDateRecords){
-      v(1)&& log(`Duplicates found on date ${new Date(dateStr).toLocaleDateString('ro-RO')}.`);
-      v(2)&& log('resolving same-date-key conflicts...');
+      //v(1)&& log(`Duplicates found on date ${new Date(dateStr).toLocaleDateString('ro-RO')}.`);
+      //v(2)&& log('resolving same-date-key conflicts...');
       const mergedDateRecords = mergeDateRecords(foundDateRecords, existingDateRecords);
       existingRecords.set(dateStr, mergedDateRecords);
     } else if (foundDateRecords){
@@ -1119,7 +1103,7 @@ function importData(
     }
   }
 
-  v(2)&& log('updating raw data sheet...')
+  //v(2)&& log('updating raw data sheet...')
   const rawValues = [];
   const keyDates = Array.from(existingRecords.keys()).sort();
   keyDates.forEach(
@@ -1140,13 +1124,13 @@ function importData(
   const rawDataRange = sheetToImportTo.getRange(2, 1, rawValues.length, rawValues[0].length);
   // delete all existing records
   sheetToImportTo.getRange('A2:F').clear();
-  v(2)&& log(`Deleted all 'A2:F' values from sheet ${sheetToImportTo.getName()}!`); 
+  //v(2)&& log(`Deleted all 'A2:F' values from sheet ${sheetToImportTo.getName()}!`); 
   // writing new values
   
-  v(2)&& log(`Writing new values...`);
+  //v(2)&& log(`Writing new values...`);
   rawDataRange.setValues(rawValues);
 
-  v(0)&& log('Procedure importData END');
+  //v(0)&& log('Procedure importData END');
 } // importData END
 
 /**
@@ -1175,7 +1159,7 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
       thisMethod.messages.get(message)[0] += 1;
     else thisMethod.messages.set(message,[1]);
     };
-  addMessage(-1, `very important message`);
+  addMessage(0, `very important message`);
   
   addMessage(2, `values retrieved from sheet ${rawDataSheet.getName()}`);
 
@@ -1690,14 +1674,14 @@ function getFieldNames(firstRow){
   return fieldNames;
 }
 
-function getRecords(rawDataSheet, v, log){
+function getRecords(rawDataSheet){
   const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
 
   const dataRange = rawDataSheet.getRange('A1:Z');
   const rangeValues = dataRange.getValues();
   const rowCount = rangeValues.length;
-  v(1)&& log(`Records in ${rawDataSheet.getName()}: ${rowCount}`);
+  //v(1)&& log(`Records in ${rawDataSheet.getName()}: ${rowCount}`);
 
   const records = new Map();
 
