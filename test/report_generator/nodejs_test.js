@@ -14,11 +14,11 @@ const argumentsValidator = libraryGet('argumentsValidator');
 const FieldValidator = libraryGet('FieldValidator');
 const validateRecord = libraryGet('validateRecord');
 const cleanRawData = libraryGet('cleanRawData');
+const renderReport = libraryGet('renderReport');
 
 const tests = new Map();
 
 tests.set('addMessages', () => {
-
   function someProcedure(...args){
     const addMessage = addMessages(someProcedure);
     addMessage(`I was called with first arg: ${args[0]}`);
@@ -62,7 +62,6 @@ tests.set('Log', () => {
   messages = ['cva'];
   log(messages[0]);
   assert.equal(cellValue[0], '> '+messages.join('\n> '));
-
 });
 
 tests.set('getType', () => {
@@ -295,7 +294,10 @@ tests.set('validateRecord', () => {
 });
 
 tests.set('cleanRawData', () => {
-  cleanRawData.verbosity = 2;
+  // set verbosity to 0...2
+  const v = 0;
+  cleanRawData.verbosity = v;
+
   for (const [correctable_case, correct_case] of [
     [
     // correct record
@@ -347,7 +349,7 @@ tests.set('cleanRawData', () => {
       getRange(str){return Range;},getName(){return 'sheet_name'}};
 
     cleanRawData(fromDate, toDate, company, rawDataSheet);
-    //console.log(cleanRawData.messages);
+    v && console.log(cleanRawData.messages);
 
     // now values should be cleaned
     assert.deepStrictEqual(values[1], correct_case);
@@ -379,7 +381,7 @@ tests.set('cleanRawData', () => {
     assert.throws(()=>{
       cleanRawData(fromDate, toDate, company, rawDataSheet);
     },{name:'ValueError'},`should throw ValueError on case ${throwingCase}`);
-    //console.log(cleanRawData.messages);
+    v && console.log(cleanRawData.messages);
   }
   // 10 empty rows (if encountered) is considered end of data set
   const twelveEmptyRows = Array(12).fill(Array(6));
@@ -403,8 +405,8 @@ tests.set('cleanRawData', () => {
       [new Date(2015,1,28), 'ref8', 'docType8', 'descr7', 0, 26],
       [ , , , , , ,],
       [ , , , , , ,],
-      ...twelveEmptyRows,
       ...fiveEmptyRows,
+      ...twelveEmptyRows,
       ]
     ],
   ]) {
@@ -419,11 +421,18 @@ tests.set('cleanRawData', () => {
     const rawDataSheet = {
       getRange(str){return Range;},getName(){return 'sheet_name'}};
 
+    cleanRawData.verbosity = v; 
     cleanRawData(fromDate, toDate, company, rawDataSheet);
 
     assert.deepStrictEqual(values, sortedWithoutDuplicates);
-    //console.log(cleanRawData.messages);
+    v && console.log(cleanRawData.messages);
   }
+});
+
+tests.set('renderReport', () => {
+  renderReport.verbosity = 2;
+  //renderReport();
+  //console.log(renderReport.messages);
 });
 
 
@@ -434,4 +443,5 @@ tests.get('argumentsValidator')();
 tests.get('FieldValidator')();
 tests.get('validateRecord')();
 tests.get('cleanRawData')();
+tests.get('renderReport')();
 

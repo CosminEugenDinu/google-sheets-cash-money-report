@@ -69,7 +69,11 @@ const rawDataSheet = repGenSprSheet.getSheetByName(companyAlias+RAWDATA_SHEET_SU
 if (procedure==='renderReport'){
   let args;
   try{
-    const dataRecords = getRecords(rawDataSheet);
+    getRecords.verbosity = verbosity;
+    //const dataRecords = getRecords(rawDataSheet);
+    const messages = getRecords.messages;
+    if (messages) for (let [msg, count] of messages){ log(count, msg); }
+
     const template = defaultTemplate();
     const targetSpreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
 
@@ -79,12 +83,18 @@ if (procedure==='renderReport'){
     throw new Error(
       `When initializing arguments for procedure ${procedure}, got:\n${e.message}`);
   }
-
+  let mesages;
   try{
-    libraryGet(procedure)(...args);
+    const renderReport = libraryGet(procedure);
+    renderReport.verbosity = verbosity;
+    renderReport(...args);
+    messages = renderReport.messages;
   } catch (e) {
-    throw new Error(`Procedure ${procedure} failed with:\n${e.message}`);
+    throw new Error(`Procedure ${procedure} failed with:\n${e.message}`+
+    `\nComplete Error object is:\n${JSON.stringify(e)}`);
   }
+  if (messages)
+    for (const [msg, count] of messages) log(count, msg);
 }
 
 //---------------------------------------------------------------------------------
@@ -95,9 +105,10 @@ if (procedure==='importData'){
     // spreadsheet links iterable
     const dataLinks = settings.getField(`link.${companyAlias}`).getValues();
     // this pattern is uset to search records in source spreadsheets (dataLinks);
-    const identifierPattern = settings.getField('procedure.variable.value').getByIndex(
-      settings.getField('procedure.variable.name')
-      .getByValue('importData.identifierPattern')
+    const identifierPattern = settings.getField('procedure.variable.value')
+      .getByIndex(
+        settings.getField('procedure.variable.name')
+        .getByValue('importData.identifierPattern')
       );
     const [sheetToImportTo] = rawDataSheets.filter(
       sheet => sheet.getName() === company.get('alias')+RAWDATA_SHEET_SUFFIX
@@ -110,31 +121,39 @@ if (procedure==='importData'){
       `When initializing arguments for procedure ${procedure}, got:\n${e.message}`);
   }
 
+  let mesages;
   try{
-    libraryGet(procedure)(...args);
-  } catch(e){
-    throw new Error(`Procedure ${procedure} failed with:\n${e.message}`);
+    const importData = libraryGet(procedure);
+    importData.verbosity = verbosity;
+    importData(...args);
+    messages = importData.messages;
+  } catch (e) {
+    throw new Error(`Procedure ${procedure} failed with:\n${e.message}`+
+    `\nComplete Error object is:\n${JSON.stringify(e)}`);
   }
+  if (messages)
+    for (const [msg, count] of messages) log(count, msg);
 }
 
 //---------------------------------------------------------------------------------
 
 if (procedure === 'cleanRawData'){
-  v(1)&& log('Procedure cleanRawData begin');
 
   const args = [fromDate, toDate, company, rawDataSheet];
-  const messages = [];
 
+  let mesages;
   try{
     const cleanRawData = libraryGet(procedure);
     cleanRawData.verbosity = verbosity;
     cleanRawData(...args);
     if (cleanRawData.messages)
-      for (const [mes, count] of cleanRawData.messages) v(0) && log(count, mes);
-  } catch(e){
-    throw new Error(`Procedure ${procedure} failed with:\n${e.message}\n${JSON.stringify(e)}`);
+      for (const [msg, count] of cleanRawData.messages) log(count, mes);
+  } catch (e) {
+    throw new Error(`Procedure ${procedure} failed with:\n${e.message}`+
+    `\nComplete Error object is:\n${JSON.stringify(e)}`);
   }
-  v(1)&& log('Procedure cleanRawData END');
+  if (messages)
+    for (const [msg, count] of messages) log(count, msg);
 }
 
 } // main END
@@ -142,8 +161,6 @@ if (procedure === 'cleanRawData'){
 
 
 // -------------------------- library --------------------------------
-
-
 
 
 // ----------Global functions (in makeReport scope)---------------
@@ -596,13 +613,17 @@ class Settings{
 
 
 function renderReport(
-    fromDate,
-    toDate,
-    company,
-    dataRecords,
-    template,
-    targetSpreadsheet){
-  v(0)&& log('Procedure renderReport begin');
+  fromDate, toDate, company, dataRecords, template,targetSpreadsheet){
+
+  const addMessages = libraryGet('addMessages');
+
+  // initialize debug messaging
+  const thisProcedure = renderReport;
+  const addMessage = addMessages(thisProcedure); // adds prop {Map} messages
+  // @prop {number} verbosity could be added at procedure call
+  const v = thisProcedure.verbosity ? thisProcedure.verbosity : 0;
+  
+  v>0 && addMessage('Procedure renderReport begin');
 
   /**
    * Class Element - is a piece of sheet... (cell, range)
@@ -928,8 +949,6 @@ function renderReport(
 
       return renderedElements;
     }
-
-
   }
 
 
@@ -997,7 +1016,7 @@ function renderReport(
        */
 
       // delete existing sheets except first
-      //v(2)&& log(`Deleting existing report sheets except first`);
+      v>1 && addMessage(`Deleting existing report sheets except first`);
       targetSpreadsheet.getSheets().forEach(sheet =>{
         if (sheet.getIndex() === 1) 
           // cover sheet 
@@ -1007,7 +1026,7 @@ function renderReport(
       }
       );
       const dates = datesBetween(fromDate, toDate);
-      //v(2)&& log(`Rendering reports between ${fromDate.toLocaleDateString('ro-RO')} and ${toDate.toLocaleDateString('ro-RO')}`);
+      v>1 && addMessages(`Rendering reports between ${fromDate.toLocaleDateString('ro-RO')} and ${toDate.toLocaleDateString('ro-RO')}`);
 
       let sheetIndex = 1
       for (const date of dates){
@@ -1016,13 +1035,11 @@ function renderReport(
         const sheet = targetSpreadsheet.insertSheet(sheetIndex++);
         const dayReport = new DailyReport(date, company, dataRecords, this.balanceCalculator());
         dayReport.render(sheet, this.template);
-        //v(2)&& log(`Day report ${new Date(date).toLocaleDateString('ro-RO')} rendered!`);
+        v>1 && addMessage(`Day report ${new Date(date).toLocaleDateString('ro-RO')} rendered!`);
       }
 
       return;
     }
-
-
   }
 
   //----------------------------------------------------------------
@@ -1031,8 +1048,9 @@ function renderReport(
   report.render(targetSpreadsheet);
   //================================================================
 
-  //v(2)&& log('Procedure renderReport END');
+  v > 0 && addMessage('Procedure renderReport END');
 } // renderReport END
+
 /**
  * Searches for company data records in provided links to standalone spreadsheets,
  * and populate corresponding rawDataSheet.
@@ -1042,15 +1060,19 @@ function renderReport(
  *      - {string} like 'https://docs.google.com/spreadsheets/d/<< sheetId >>/edit#gid=xxxxxxxxxx';
  */
 function importData(
-    fromDate,
-    toDate,
-    company,
-    dataLinks,
-    identifierPattern,
-    sheetToImportTo){
-  //v(0)&& log('Procedure importData begin');
-  //v(2)&& log(`Company alias: ${company.get('alias')}`);
+  fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo){
+
   const getRecords = libraryGet('getRecords');
+  const addMessages = libraryGet('addMessages');
+
+  // initialize debug messaging
+  const thisProcedure = importData;
+  const addMessage = addMessages(thisProcedure); // adds prop {Map} messages
+  // @prop {number} verbosity could be added at procedure call
+  const v = thisProcedure.verbosity ? thisProcedure.verbosity : 0;
+
+  v>0 && addMessage('Procedure importData begin');
+  v>1 && addMessage(`Company alias: ${company.get('alias')}`);
 
   // tableName the prefix before '.' in field name, like tableName.fieldName
   const linkTableName = 'link';
@@ -1065,7 +1087,7 @@ function importData(
           ids.push(sheetId);
           numOfEmpty = 0;
         } catch(e){
-          //v(0)&& log(`${e}\nSeems that link:\n${link}\ndoes not match pattern.`);
+          addMessage(`${e}\nSeems that link:\n${link}\ndoes not match pattern.`);
         }
       else throw new ReferenceError('No spreadsheet link.');
     }
@@ -1080,17 +1102,17 @@ function importData(
         spreadsheets.push(spreadsheet);
         return spreadsheets;
       } catch(e){
-        //v(0)&& log('When opening sheet with id\n', sheetId, '\ngot: ', e);
+        addMessage('When opening sheet with id\n', sheetId, '\ngot: ', e);
         return spreadsheets;
       }
     }, []
   );
 
   if ( ! srcSpreadsheets.length){
-    //v(0)&& log('No source spreadsheets opened!'); 
+    addMessage('No source spreadsheets opened!'); 
     return 2;
   } else {
-    //v(1)&& log(`Spreadsheets opened ${srcSpreadsheets.length}, [${srcSpreadsheets.map(ss => ss.getName())}]`);
+    v>0 && addMessage(`Spreadsheets opened ${srcSpreadsheets.length}, [${srcSpreadsheets.map(ss => ss.getName())}]`);
   }
 
   const foundRecords = new Map(); 
@@ -1100,25 +1122,27 @@ function importData(
     }
   }
 
-  //if (!foundRecords.size)
-    //v(1)&& log(`No records found in spreadsheet ${srcSpreadsheets[0].getName()}`);
- // else
-    //v(2)&& log(`Found ${foundRecords.size} day-records in spreadsheets: [${srcSpreadsheets.map(ss => ss.getName())}]`);
+  if (!foundRecords.size)
+    v>0 && addMessage(
+      `No records found in spreadsheet ${srcSpreadsheets[0].getName()}`);
+  else
+    v>1 && addMessage(
+      `Found ${foundRecords.size} day-records in spreadsheets: [${srcSpreadsheets.map(ss => ss.getName())}]`);
 
   
   // retrieve existing records in raw data sheet
   const existingRecords = getRecords(sheetToImportTo);
-  //v(2)&& log(`${existingRecords.size} day-records exists in ${sheetToImportTo.getName()}`);
+  v>1 && addMessage(`${existingRecords.size} day-records exists in ${sheetToImportTo.getName()}`);
 
   const dates = datesBetween(fromDate, toDate);
-  //v(2)&& log(`Searching found-records between ${new Date(fromDate).toLocaleDateString('ro-RO')} and ${new Date(toDate).toLocaleDateString('ro-RO')}...`);
+  v>1 && addMessage(`Searching found-records between ${new Date(fromDate).toLocaleDateString('ro-RO')} and ${new Date(toDate).toLocaleDateString('ro-RO')}...`);
 
   for (const dateStr of dates){
     const foundDateRecords = foundRecords.get(dateStr);
     const existingDateRecords = existingRecords.get(dateStr);
     if (foundDateRecords && existingDateRecords){
-      //v(1)&& log(`Duplicates found on date ${new Date(dateStr).toLocaleDateString('ro-RO')}.`);
-      //v(2)&& log('resolving same-date-key conflicts...');
+      v>0 && addMessage(`Duplicates found on date ${new Date(dateStr).toLocaleDateString('ro-RO')}.`);
+      v>1 && addMessage('resolving same-date-key conflicts...');
       const mergedDateRecords = mergeDateRecords(foundDateRecords, existingDateRecords);
       existingRecords.set(dateStr, mergedDateRecords);
     } else if (foundDateRecords){
@@ -1126,7 +1150,7 @@ function importData(
     }
   }
 
-  //v(2)&& log('updating raw data sheet...')
+  v>1 && addMessage('updating raw data sheet...')
   const rawValues = [];
   const keyDates = Array.from(existingRecords.keys()).sort();
   keyDates.forEach(
@@ -1147,13 +1171,13 @@ function importData(
   const rawDataRange = sheetToImportTo.getRange(2, 1, rawValues.length, rawValues[0].length);
   // delete all existing records
   sheetToImportTo.getRange('A2:F').clear();
-  //v(2)&& log(`Deleted all 'A2:F' values from sheet ${sheetToImportTo.getName()}!`); 
+  v>1 && addMessage(`Deleted all 'A2:F' values from sheet ${sheetToImportTo.getName()}!`); 
   // writing new values
   
-  //v(2)&& log(`Writing new values...`);
+  v>1 && addMessage(`Writing new values...`);
   rawDataRange.setValues(rawValues);
 
-  //v(0)&& log('Procedure importData END');
+  v>0 && addMessage('Procedure importData END');
 } // importData END
 
 /**
@@ -1163,33 +1187,30 @@ function importData(
  * @param {Sheet} rawDataSheet
  */
 function cleanRawData(fromDate, toDate, company, rawDataSheet){
-  delete cleanRawData.messages;
+
   const getFieldNames = libraryGet('getFieldNames');
   const FieldValidator = libraryGet('FieldValidator');
   const getType = libraryGet('getType');
+  const addMessages = libraryGet('addMessages');
+
+  // initialize debug messaging
+  const thisProcedure = cleanRawData;
+  const addMessage = addMessages(thisProcedure); // adds prop {Map} messages
+  // @prop {number} verbosity could be added at procedure call
+  const v = thisProcedure.verbosity ? thisProcedure.verbosity : 0;
+
+  v>0 && addMessage('Procedure cleanRawData begin');
   
   // retrieve from spreadsheet
   const dataRange = rawDataSheet.getRange('A1:Z');
   const values = dataRange.getValues();
-
-  const addMessage = (verbosityLevel, message) => {
-    const thisMethod = cleanRawData;
-    if (thisMethod.verbosity < verbosityLevel)
-      return;
-    if ( ! thisMethod.hasOwnProperty('messages'))
-      thisMethod.messages = new Map();
-    if (thisMethod.messages.has(message)) 
-      thisMethod.messages.get(message)[0] += 1;
-    else thisMethod.messages.set(message,[1]);
-    };
-  addMessage(0, `very important message`);
   
-  addMessage(2, `values retrieved from sheet ${rawDataSheet.getName()}`);
+  v>1 && addMessage(`values retrieved from sheet ${rawDataSheet.getName()}`);
 
   const startTimer = Date.now();
 
   const fieldNames = getFieldNames(values[0]);
-  addMessage(2, `fieldNames are ${JSON.stringify(fieldNames)}`);
+  v>1 && addMessage(`fieldNames are ${JSON.stringify(fieldNames)}`);
   // list of all indexes that have an associated field
   const fieldIndexes = [];
   for (const fieldName in fieldNames)
@@ -1256,7 +1277,7 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
 
     // if 10 empty records are encountered then is end of data set
     if (emptyRowCount > 9){
-      addMessage(2, `found ${emptyRowCount} empty rows, so break`); 
+      v>1 && addMessage(`found ${emptyRowCount} empty rows, so break`); 
       break;
     }
 
@@ -1291,7 +1312,7 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
           try { validator.validate(fieldName, converted);}
           catch(e){ e.rowIndex = row_i; throw e}
 
-          addMessage(2,`converted {${getType(testValue)}} ${testValue} `+
+          v>1 && addMessage(`converted {${getType(testValue)}} ${testValue} `+
           `to {${getType(converted)}} ${converted} in row_i=${row_i}`);
 
           // write value again in record array
@@ -1313,13 +1334,13 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
     }
   }
   
-  addMessage(2, `values.length ${values.length}`)
-  addMessage(2, `uniques.length ${uniques.length}`)
+  v>1 && addMessage(`values.length ${values.length}`)
+  v>1 && addMessage(`uniques.length ${uniques.length}`)
 
   // now we got all indexes of unique values 
   // let't remove them by constructing a new set of values
   const newValues = indexesOfUnique.map(i => values[i]);
-  addMessage(2, `newValues.length ${newValues.length}`);
+  v>1 && addMessage(`newValues.length ${newValues.length}`);
 
   // sort records by date except first row (index 0) - field names
   // in order to do that, temporary change first record value (first field name)
@@ -1328,7 +1349,7 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   newValues[0][0] = new Date(0);
   newValues.sort((rec1, rec2) => rec1[0] - rec2[0]); 
   newValues[0][0] = firstFieldName;
-  addMessage(2, `newValues sorted`);
+  v>1 && addMessage(`newValues sorted`);
 
   // enlarge newValues with empty values to match range
   const limit = values.length - newValues.length; 
@@ -1338,15 +1359,13 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
     ++start_i;
   }
   
-  addMessage(2, `procedure done in ${(Date.now() - startTimer)/1000} sec`);
+  v>1 && addMessage(`procedure done in ${(Date.now() - startTimer)/1000} sec`);
   // reset values on range
   dataRange.setValues(newValues); 
-  addMessage(2, 'all new values written');
-
+  v>1 && addMessage('all new values written');
+  v>0 && addMessage('procedure cleanRawData END');
   return 'done';
 } // procedure cleanRawData END
-//cleanRawData.messages = new Map();
-cleanRawData.verbosity = 0; 
 
 
 /**
@@ -1700,11 +1719,18 @@ function getFieldNames(firstRow){
 function getRecords(rawDataSheet){
   const validate = libraryGet('validateRecord');
   const getFieldNames = libraryGet('getFieldNames');
+  const addMessages = libraryGet('addMessages');
+
+  // initialize debug messaging
+  const thisProcedure = getRecords;
+  const addMessage = addMessages(thisProcedure); // adds prop {Map} messages
+  // @prop {number} verbosity could be added at procedure call
+  const v = thisProcedure.verbosity ? thisProcedure.verbosity : 0;
 
   const dataRange = rawDataSheet.getRange('A1:Z');
   const rangeValues = dataRange.getValues();
   const rowCount = rangeValues.length;
-  //v(1)&& log(`Records in ${rawDataSheet.getName()}: ${rowCount}`);
+  v>0 && addMessage(`Records in ${rawDataSheet.getName()}: ${rowCount}`);
 
   const records = new Map();
 
