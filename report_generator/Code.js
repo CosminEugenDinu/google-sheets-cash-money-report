@@ -1337,7 +1337,7 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   // now we got all indexes of unique values 
   // let't remove them by constructing a new set of values
   const newValues = indexesOfUnique.map(i => values[i]);
-  v>1 && addMessage(`newValues.length ${newValues.length}`);
+  v>1 && addMessage(`newValues.length ${newValues.length} <- this includes first row - fields names`);
 
   // sort records by date except first row (index 0) - field names
   // in order to do that, temporary change first record value (first field name)
