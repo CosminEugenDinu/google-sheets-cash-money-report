@@ -141,19 +141,16 @@ if (procedure === 'cleanRawData'){
 
   const args = [fromDate, toDate, company, rawDataSheet];
 
-  let mesages;
   try{
     const cleanRawData = libraryGet(procedure);
     cleanRawData.verbosity = verbosity;
     cleanRawData(...args);
-    if (cleanRawData.messages)
-      for (const [msg, count] of cleanRawData.messages) log(count, mes);
+    const messages = cleanRawData.messages;
+    if (messages) for (const [msg, count] of messages){log(count, msg);}
   } catch (e) {
     throw new Error(`Procedure ${procedure} failed with:\n${e.message}`+
     `\nComplete Error object is:\n${JSON.stringify(e)}`);
   }
-  if (messages)
-    for (const [msg, count] of messages) log(count, msg);
 }
 
 } // main END
