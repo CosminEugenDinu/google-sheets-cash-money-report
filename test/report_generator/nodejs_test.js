@@ -327,7 +327,7 @@ tests.set('cleanRawData', () => {
       getRange(str){return Range;},getName(){return 'sheet_name'}};
 
     cleanRawData(fromDate, toDate, company, rawDataSheet);
-    console.log(cleanRawData.messages);
+    //console.log(cleanRawData.messages);
 
     // now values should be cleaned
     assert.deepStrictEqual(values[1], correct_case);
@@ -359,7 +359,7 @@ tests.set('cleanRawData', () => {
     assert.throws(()=>{
       cleanRawData(fromDate, toDate, company, rawDataSheet);
     },{name:'ValueError'},`should throw ValueError on case ${throwingCase}`);
-    console.log(cleanRawData.messages);
+    //console.log(cleanRawData.messages);
   }
   // 10 empty rows (if encountered) is considered end of data set
   const twelveEmptyRows = Array(12).fill(Array(6));
@@ -384,6 +384,7 @@ tests.set('cleanRawData', () => {
       [ , , , , , ,],
       [ , , , , , ,],
       ...twelveEmptyRows,
+      ...fiveEmptyRows,
       ]
     ],
   ]) {
@@ -400,8 +401,8 @@ tests.set('cleanRawData', () => {
 
     cleanRawData(fromDate, toDate, company, rawDataSheet);
 
-    //assert.deepStrictEqual(values, sortedWithoutDuplicates);
-    console.log(cleanRawData.messages);
+    assert.deepStrictEqual(values, sortedWithoutDuplicates);
+    //console.log(cleanRawData.messages);
   }
 });
 
