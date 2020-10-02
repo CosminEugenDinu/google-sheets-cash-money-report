@@ -1011,7 +1011,7 @@ function renderReport(
        *   render every dayReport to sheet according with date,
        *   and DONE
        */
-
+          
       // delete existing sheets except first
       v>1 && addMessage(`Deleting existing report sheets except first`);
       targetSpreadsheet.getSheets().forEach(sheet =>{
@@ -1023,7 +1023,8 @@ function renderReport(
       }
       );
       const dates = datesBetween(fromDate, toDate);
-      v>1 && addMessages(`Rendering reports between ${fromDate.toLocaleDateString('ro-RO')} and ${toDate.toLocaleDateString('ro-RO')}`);
+
+      v>1 && addMessage(`Rendering reports between ${fromDate.toLocaleDateString('ro-RO')} and ${toDate.toLocaleDateString('ro-RO')}`);
 
       let sheetIndex = 1
       for (const date of dates){
@@ -1369,7 +1370,6 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
  * Arguments validator
  */
 function argumentsValidator(){
-  const getType = libraryGet('getType');
   // variable enclosed by setArgTypes function
   const _argTypes = [];
 
@@ -1383,7 +1383,12 @@ function argumentsValidator(){
   
   const validateArgs = (...currArgs) => {
     if (currArgs.length !== _argTypes.length){
-      throw new TypeError('Wrong number of arguments');
+      const err = new TypeError('Wrong number of arguments');
+      err.currArgsLength = currArgs.length;
+      err.expectedArgsLength = _argTypes.length;
+      err.currArgsTypes = currArgs;
+      err.expectedArgsTypes = _argTypes; 
+      throw err;
     }
     _argTypes.forEach((type, i) =>{
       const currArg = currArgs[i];
@@ -1396,7 +1401,6 @@ function argumentsValidator(){
   }; 
   // returns setter and validator closure functions
   return [setArgTypes, validateArgs];
-
 } // argumentsValidator END
 
 /**

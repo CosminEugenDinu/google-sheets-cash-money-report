@@ -495,8 +495,9 @@ tests.set('getRecords', () => {
     if (records.has(dateKey)) records.get(dateKey).push(record)
     else records.set(dateKey, [record]); 
   }
-
+  getRecords.verbosity = v;
   assert.deepStrictEqual(getRecords(rawDataSheet, fieldDescriptors), records);
+  console.log(getRecords.messages);
 });
 
 tests.get('addMessages')();
