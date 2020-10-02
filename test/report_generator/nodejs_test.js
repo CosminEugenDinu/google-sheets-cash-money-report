@@ -455,7 +455,8 @@ tests.set('renderReport', () => {
 
 tests.set('getRecords', () => {
   // verbosity
-  const v = 2;
+  const v = 0;
+  if (v) console.log('testing getRecords procedure...');
 
   const fieldDescriptors = [
     {fieldName:"date",fieldType:"Date"},
@@ -508,7 +509,7 @@ tests.set('getRecords', () => {
   }
   getRecords.verbosity = v;
   assert.deepStrictEqual(getRecords(rawDataSheet, fieldDescriptors), records);
-  console.log(getRecords.messages);
+  v && console.log(getRecords.messages);
 });
 
 tests.get('addMessages')();

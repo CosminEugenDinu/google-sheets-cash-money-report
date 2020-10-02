@@ -81,7 +81,8 @@ if (procedure==='renderReport'){
 
   } catch(e){
     throw new Error(
-      `When initializing arguments for procedure ${procedure}, got:\n${e.message}`);
+      `When initializing arguments for procedure ${procedure}, got:\n`+
+      `e.message: ${e.message}, json: ${JSON.stringify(e)}`);
   }
   let mesages;
   try{
@@ -117,8 +118,8 @@ if (procedure==='importData'){
     args = [fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo];
 
   } catch(e){
-    throw new Error(
-      `When initializing arguments for procedure ${procedure}, got:\n${e.message}`);
+    throw new Error(`Procedure ${procedure} failed with:\n${e.message}`+
+    `\nComplete Error object is:\n${JSON.stringify(e)}`);
   }
 
   let mesages;
@@ -1784,12 +1785,11 @@ function getRecords(rawDataSheet, fieldDescriptors){
     expectedFieldNames.push(fieldName);
     if (fieldName in fieldNames){
       const fieldIndex = fieldNames[fieldName];
-
       validator.setField(
         fieldName, fieldIndex, fieldDescr.fieldType,
-        fieldDescr.minValue || null,
-        fieldDescr.maxValue || null,
-        fieldDescr.exactValues || null);
+        fieldDescr.minValue,
+        fieldDescr.maxValue,
+        fieldDescr.exactValues);
     } else {
       const err = new TypeError('Not found');
       err.fieldName = fieldName;
