@@ -1370,7 +1370,6 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
  * Arguments validator
  */
 function argumentsValidator(){
-  const getType = libraryGet('getType');
   // variable enclosed by setArgTypes function
   const _argTypes = [];
 
@@ -1384,7 +1383,12 @@ function argumentsValidator(){
   
   const validateArgs = (...currArgs) => {
     if (currArgs.length !== _argTypes.length){
-      throw new TypeError('Wrong number of arguments');
+      const err = new TypeError('Wrong number of arguments');
+      err.currArgsLength = currArgs.length;
+      err.expectedArgsLength = _argTypes.length;
+      err.currArgsTypes = currArgs;
+      err.expectedArgsTypes = _argTypes; 
+      throw err;
     }
     _argTypes.forEach((type, i) =>{
       const currArg = currArgs[i];
@@ -1397,7 +1401,6 @@ function argumentsValidator(){
   }; 
   // returns setter and validator closure functions
   return [setArgTypes, validateArgs];
-
 } // argumentsValidator END
 
 /**
