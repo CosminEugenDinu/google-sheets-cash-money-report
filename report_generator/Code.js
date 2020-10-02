@@ -81,7 +81,8 @@ if (procedure==='renderReport'){
 
   } catch(e){
     throw new Error(
-      `When initializing arguments for procedure ${procedure}, got:\n${e.message}`);
+      `When initializing arguments for procedure ${procedure}, got:\n`+
+      `e.message: ${e.message}, json: ${JSON.stringify(e)}`);
   }
   let mesages;
   try{
@@ -117,8 +118,8 @@ if (procedure==='importData'){
     args = [fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo];
 
   } catch(e){
-    throw new Error(
-      `When initializing arguments for procedure ${procedure}, got:\n${e.message}`);
+    throw new Error(`Procedure ${procedure} failed with:\n${e.message}`+
+    `\nComplete Error object is:\n${JSON.stringify(e)}`);
   }
 
   let mesages;
@@ -1441,47 +1442,56 @@ class FieldValidator{
    * @param {*} [maxValue]
    * @param {Set} [exactValues]
    */
-  setField(fieldName, fieldIndex, fieldType, minValue, maxValue, exactValues){
+  setField(fieldName, fieldIndex, fieldType, minValue, maxValue, exactValues,sentinel){
     
     const [setArgTypes, validateArgs] = argumentsValidator();
+    
+    // setField is called with these arguments
+    const currArgs = [
+      fieldName, fieldIndex, fieldType, minValue, maxValue, exactValues,];
+    // sentinel should be undefined to limit the number of arguments
+    if (sentinel !== undefined) currArgs.push('wrong argument');
 
-    // number of actual parameters
-    // last undefined actual parameters are excluded
-    const paramLength = arguments.length;
-    let lastArgIndex = paramLength;
-    while (--lastArgIndex > 0){
-      if (arguments[lastArgIndex] !== undefined) break;
+    // dynamic arguments types
+    
+    const null_undefined = ['null','undefined'];
+    const isNone = typeStr => null_undefined.includes(typeStr);
+
+    // required minValue type
+    const minValueArgType = getType(minValue);
+    const minValueType = isNone(minValueArgType) ?
+      minValueArgType : fieldType;
+
+    // required maxValue type
+    const maxValueArgType = getType(maxValue);
+    const maxValueType = isNone(maxValueArgType) ?
+      maxValueArgType : fieldType;
+
+    // required exactValues type
+    const exactValuesArgType = getType(exactValues);
+    // if both minValue and maxValue are null/undefined
+    // then exactValues can be {Set} or null/undefined
+    // else if either minValue or maxValue are not null/undefined
+    // thin exactValues can be only null/undefined
+    if (isNone(minValueType) && isNone(maxValueType)){
+      if (isNone(exactValuesArgType))
+        setArgTypes(
+          'string','number','string',minValueType,maxValueType,exactValuesArgType,);
+      else
+        setArgTypes(
+          'string','number','string',minValueType,maxValueType,'Set');
+    } else {
+      // here either minValueType or maxValueType are not none
+      if (isNone(exactValuesArgType))
+        setArgTypes(
+          'string','number','string',minValueType,maxValueType,exactValuesArgType);
+      else // here we got not none type for last arg (exactValues)
+        // chosen default type for exactValues is 'undefined'
+        setArgTypes(
+          'string','number','string',minValueType,maxValueType,'undefined');
     }
-    const argsLength = lastArgIndex + 1;
-
-    if (argsLength < 3)
-      throw new TypeError('Invalid number of arguments');
-
-    if (argsLength === 3)
-      setArgTypes('string','number','string');
-    else if (argsLength === 4){
-      const minValueType = getType(minValue)==='null'?'null':fieldType;
-      setArgTypes('string','number','string', minValueType);
-    } else if (argsLength === 5){
-      const minValueType = getType(minValue)==='null' ?
-        'null':fieldType;
-      const maxValueType = getType(maxValue)==='null' ?
-        'null':fieldType;
-      setArgTypes('string','number','string', minValueType, maxValueType);
-    } else if (argsLength === 6){
-      const minValueType = getType(minValue)==='null' ?
-        'null':fieldType;
-      const maxValueType = getType(maxValue)==='null' ?
-        'null':fieldType;
-      const typeOfLastArg = getType(exactValues)==='null' ?
-        'null':'Set';
-      const exactValuesType = (minValueType==='null' && maxValueType==='null') ?
-        typeOfLastArg :'null';
-      setArgTypes('string','number','string', minValueType, maxValueType, exactValuesType);
-    }
-
-    //setArgTypes('string','number','string',fieldType,fieldType,'Set');
-    validateArgs(...arguments);
+    // validate all arguments ==================
+    validateArgs(...currArgs);
 
     const field = new Map();
     if (this._fieldNames.has(fieldName))
@@ -1775,12 +1785,11 @@ function getRecords(rawDataSheet, fieldDescriptors){
     expectedFieldNames.push(fieldName);
     if (fieldName in fieldNames){
       const fieldIndex = fieldNames[fieldName];
-
       validator.setField(
         fieldName, fieldIndex, fieldDescr.fieldType,
-        fieldDescr.minValue || null,
-        fieldDescr.maxValue || null,
-        fieldDescr.exactValues || null);
+        fieldDescr.minValue,
+        fieldDescr.maxValue,
+        fieldDescr.exactValues);
     } else {
       const err = new TypeError('Not found');
       err.fieldName = fieldName;
