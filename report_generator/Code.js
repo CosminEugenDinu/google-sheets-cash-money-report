@@ -118,8 +118,9 @@ if (procedure==='importData'){
     args = [fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo];
 
   } catch(e){
-    throw new Error(`Procedure ${procedure} failed with:\n${e.message}`+
-    `\nComplete Error object is:\n${JSON.stringify(e)}`);
+    throw new Error(
+      `When initializing arguments for procedure ${procedure}, got:\n`+
+      `e.message: ${e.message}, json: ${JSON.stringify(e)}`);
   }
 
   let mesages;
@@ -1059,7 +1060,7 @@ function renderReport(
  *      - {string} like 'https://docs.google.com/spreadsheets/d/<< sheetId >>/edit#gid=xxxxxxxxxx';
  */
 function importData(
-  fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo){
+  fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo, SpreadsheetApp){
 
   const getRecords = libraryGet('getRecords');
   const addMessages = libraryGet('addMessages');
@@ -1092,6 +1093,8 @@ function importData(
     }
     return ids;
   })(dataLinks)
+  v>0 && addMessage(`Found ${sheetIds.length} ids in links`)
+  v>1 && addMessage(`sheeIds: ${sheetIds}`);
 
   // list of source Spreadsheets opened by ids;
   const srcSpreadsheets = sheetIds.reduce(
@@ -1101,7 +1104,7 @@ function importData(
         spreadsheets.push(spreadsheet);
         return spreadsheets;
       } catch(e){
-        addMessage('When opening sheet with id\n', sheetId, '\ngot: ', e);
+        addMessage(`When opening sheet with id ${sheetId}\ngot ${e}`);
         return spreadsheets;
       }
     }, []
