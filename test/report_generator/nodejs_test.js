@@ -14,9 +14,10 @@ const argumentsValidator = libraryGet('argumentsValidator');
 const FieldValidator = libraryGet('FieldValidator');
 const validateRecord = libraryGet('validateRecord');
 const cleanRawData = libraryGet('cleanRawData');
-const renderReport = libraryGet('renderReport');
-
 const getRecords = libraryGet('getRecords');
+const renderReport = libraryGet('renderReport');
+const importData = libraryGet('importData');
+
 
 const tests = new Map();
 
@@ -512,6 +513,61 @@ tests.set('getRecords', () => {
   v && console.log(getRecords.messages);
 });
 
+tests.set('importData', () => {
+  const v = 2; // verbosity
+  v > 0 && console.log('testing importData procedure...');
+
+  // mocks
+  const id1 = '1e0nIxg2pNLnnSPmKdmkRHS7cl7kVEj2G9CKBksXflEk';
+  const id2 = '1nDNPcpgP9TlAcTSKASwFxuQQswdAI7Wm3I8Z-7rSGnE';
+  const link1 = 'https://docs.google.com/spreadsheets/d/1e0nIxg2pNLnnSPmKdmkRHS7cl7kVEj2G9CKBksXflEk/edit#gid=1736293773';
+  const link2 = 'https://docs.google.com/spreadsheets/d/1nDNPcpgP9TlAcTSKASwFxuQQswdAI7Wm3I8Z-7rSGnE/edit#gid=0';
+  const sourceValues = [];
+  const sourceRange = {getValues(){return sourceValues;},
+    getFormulas(){return ['=FORMULA(A1:B2)']}};
+  const sourceSheet = {getName(){return 'source_sheet_name';},
+    getRange(){return sourceRange;}};
+  const sourceSpreadsheet = {getSheets(){return [sourceSheet]},
+    getName(){return 'spreadsheet_name'}};
+  const SpreadsheetApp = {openById(id){if(id===id1)return sourceSpreadsheet;}};
+
+  let values = [];
+  const targetRange = {getValues(){return values;},
+    setValues(values){values = values;},clear(){return targetRange;},};
+  const targetSheet = {getName(){return 'target_sheet_name';},
+    getRange(){return targetRange;}};
+
+  const fromDate=new Date(), toDate=new Date();
+  const company = ((company)=>{
+    company.set('alias', 'colibri'); return company;})(new Map());
+  const dataLinks = [link1];
+  const identifierPattern = 'someregexrpattern';
+  const sheetToImportTo = targetSheet;
+  // mocks END
+
+  const args = [
+    fromDate,toDate,company,dataLinks,identifierPattern,sheetToImportTo,SpreadsheetApp];
+
+  values = [
+    ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
+  ];
+  values = [
+    ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
+    ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
+    ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
+    ...Array(5).fill(Array(values[0].length)),
+    ['ref8',,,new Date(2015,1,28),'docType8','descr7','unknown',0,,26,,,],
+    ['ref8',,,new Date(2016,1,27),'docType8','descr8','unknown',0,,26,,,],
+    ['ref8',,,new Date(2016,1,27),'docType8','descr8','unknown',0,,26,,,],
+    ...Array(20).fill(Array(values[0].length)),
+    ];
+  //values = [];
+  importData.verbosity = v;
+  importData(...args);
+  v>0 && console.log(importData.messages);
+
+});
+
 tests.get('addMessages')();
 tests.get('Log')();
 tests.get('getType')();
@@ -521,3 +577,4 @@ tests.get('validateRecord')();
 tests.get('cleanRawData')();
 tests.get('renderReport')();
 tests.get('getRecords')();
+tests.get('importData')();
