@@ -599,6 +599,7 @@ tests.set('importData', () => {
           sheetValues[i][j] = values[i][j];
         }
       }
+      console.log(sheetValues);
       return sheetValues;
     }
     return getSheetValues;
