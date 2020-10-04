@@ -312,7 +312,7 @@ tests.set('validateRecord', () => {
 
 tests.set('cleanRawData', () => {
   // set verbosity to 0...2
-  const v = 0;
+  const v = 2;
   cleanRawData.verbosity = v;
 
   for (const [correctable_case, correct_case] of [
@@ -517,31 +517,121 @@ tests.set('importData', () => {
   const v = 2; // verbosity
   v > 0 && console.log('testing importData procedure...');
 
+  //const pattern = `=RIGHT(CELL("filename",A11),LEN(CELL("filename",A11))-FIND("]",CELL("filename",A11)))`;
+  const pattern = `=RIGHT(CELL("filename",A12),LEN(CELL("filename",A12))-FIND("]",CELL("filename",Ad12)))`;
+
+  //const pattern = 'ceva';
+  //const identifierRePat = 'ceva';
+  //const identifierRe = /=RIGHT\(CELL\("filename",A\d\),LEN\(CELL\("filename",A\d\)\)-FIND\("\]",CELL\("filename",A\d\)\)\)/;
+  const identifierRePat = '\=RIGHT\\(CELL\\("filename",A\\d{1,2}\\),LEN\\(CELL\\("filename",A\\d{1,2}\\)\\)-FIND\\("\\]",CELL\\("filename",A\\d{1,2}\\)\\)\\)';
+
+  const sourceValues1 = [
+...Array(10).fill(Array(6)),
+[          ,        ,     ,                        ,          ,       ,],
+[          ,'REGISTRUL DE CASĂ', ,                 ,          ,       ,],
+['DOCUMENT',     ,     ,'EXPLICAȚII'               ,'INCASĂRI','PLĂȚI',],
+['DATA'    ,    'NR','TIP',                        ,          ,       ,],
+[          ,        ,     ,'SOLD LUNA PRECEDENTĂ:' ,   1812.23,       ,],
+[pattern   ,'Z:0156','FAE','INCASARI SERVICII'     ,    233.00,       ,],
+[pattern   ,      10,'CHI','CHIRIE SEPTEMBRIE 2015',          ,2000.00,],
+[          ,        ,     ,                        ,          ,       ,],
+[          ,        ,     ,'=F(A1:B2)'             ,   2045.23,2000.00,],
+[          ,        ,     ,'=F(A1:B2)'             ,     45.23,       ,],
+...Array(20).fill(Array(6)),
+  ];
+
+  const sourceValues2 = [
+...Array(10).fill(Array(6)),
+[          ,        ,     ,                        ,          ,       ,],
+[          ,'REGISTRUL DE CASĂ', ,                 ,          ,       ,],
+['DOCUMENT',     ,     ,'EXPLICAȚII'               ,'INCASĂRI','PLĂȚI',],
+['DATA'    ,    'NR','TIP',                        ,          ,       ,],
+[          ,        ,     ,'SOLD LUNA PRECEDENTĂ:' ,     45.23,       ,],
+[pattern   ,'Z:0157','FAE','INCASARI SERVICII'     ,    173.00,       ,],
+[pattern   ,      26,'FAE','IMPRUMUT NUMERAR'      ,    450.00,       ,],
+[pattern   ,15003905,'CHI','XEROX COLOTECH+ A4 90g/mp',       , 521.73,],
+[          ,        ,     ,                        ,          ,       ,],
+[          ,        ,     ,'=F(A1:B2)'             ,    668.23, 521.73,],
+[          ,        ,     ,'=F(A1:B2)'             ,    146.50,       ,],
+...Array(20).fill(Array(6)),
+  ];
   // mocks
   const id1 = '1e0nIxg2pNLnnSPmKdmkRHS7cl7kVEj2G9CKBksXflEk';
   const id2 = '1nDNPcpgP9TlAcTSKASwFxuQQswdAI7Wm3I8Z-7rSGnE';
   const link1 = 'https://docs.google.com/spreadsheets/d/1e0nIxg2pNLnnSPmKdmkRHS7cl7kVEj2G9CKBksXflEk/edit#gid=1736293773';
   const link2 = 'https://docs.google.com/spreadsheets/d/1nDNPcpgP9TlAcTSKASwFxuQQswdAI7Wm3I8Z-7rSGnE/edit#gid=0';
-  const sourceValues = [];
-  const sourceRange = {getValues(){return sourceValues;},
-    getFormulas(){return ['=FORMULA(A1:B2)']}};
-  const sourceSheet = {getName(){return 'source_sheet_name';},
-    getRange(){return sourceRange;}};
-  const sourceSpreadsheet = {getSheets(){return [sourceSheet]},
-    getName(){return 'spreadsheet_name'}};
+
+  // this function return closure getFormulas
+  const getFormulasGenerator = values => {
+    // function getFormulas will be a method of Range object
+    const getFormulas = () => {
+      // returns a copy of {Array[][]} values with undefined elements converted to ''
+      // and any other elements are converted to string
+      return values.map(row => {
+        // {string[]} rowOfStr
+        let rowOfStr = [];
+        // empty places of array (undefined) can be accessed only by index, like a[i]
+        for (let i=0; i<row.length; i++){
+          rowOfStr.push(row[i]===undefined?'':`${row[i]}`)
+        }
+        return rowOfStr;
+      });
+    }
+    return getFormulas;
+  };
+
+  const sourceRange1 = {getValues(){return sourceValues1;},
+    getFormulas: getFormulasGenerator(sourceValues1),
+    //getFormulas(){return sourceValues1.map(row => row.forEach)))}};
+    }
+  const sourceRange2 = {getValues(){return sourceValues2;},
+    getFormulas: getFormulasGenerator(sourceValues2),
+    //getFormulas(){return sourceValues2.map(row => row.map(val => String(val)))}
+    };
+
+  // this function return closure getSheetValues
+  const getSheetValuesGenerator = values => {
+    // function getSheetValues will be a method of Sheet object
+    const getSheetValues = (x,y,xOffset,yOffset) => {
+      // partially implemented: for now only returns values
+      // if implemented, arguments will describe dimensions of values
+      return values;
+    }
+    return getSheetValues;
+  };
+
+  const sourceSheet1 = {
+    getName(){return '01.09.2015';},
+    getRange(){return sourceRange1;},
+    getSheetValues: getSheetValuesGenerator(sourceValues1),
+    };
+  const sourceSheet2 = {
+    getName(){return '02.09.2015';},
+    getRange(){return sourceRange2;},
+    getSheetValues: getSheetValuesGenerator(sourceValues2),
+    };
+
+  const sourceSpreadsheet = {
+    getSheets(){return [sourceSheet1,sourceSheet2]},
+    getName(){return 'source_spreadsheet_name'},
+  };
   const SpreadsheetApp = {openById(id){if(id===id1)return sourceSpreadsheet;}};
 
   let values = [];
-  const targetRange = {getValues(){return values;},
-    setValues(values){values = values;},clear(){return targetRange;},};
-  const targetSheet = {getName(){return 'target_sheet_name';},
-    getRange(){return targetRange;}};
+  const targetRange = {
+    getValues(){return values;},
+    setValues(values){values = values;},clear(){return targetRange;},
+  };
+  const targetSheet = {
+    getName(){return 'target_sheet_name';},
+    getRange(){return targetRange;}
+  };
 
   const fromDate=new Date(), toDate=new Date();
   const company = ((company)=>{
     company.set('alias', 'colibri'); return company;})(new Map());
   const dataLinks = [link1];
-  const identifierPattern = 'someregexrpattern';
+  const identifierPattern = identifierRePat;
   const sheetToImportTo = targetSheet;
   // mocks END
 
@@ -561,9 +651,16 @@ tests.set('importData', () => {
     ['ref8',,,new Date(2016,1,27),'docType8','descr8','unknown',0,,26,,,],
     ...Array(20).fill(Array(values[0].length)),
     ];
+  values = [
+    ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
+    ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
+    ...Array(20).fill(Array(values[0].length)),
+  ]
   //values = [];
   importData.verbosity = v;
   importData(...args);
+  console.log('................. after call importDate ...................')
+  console.log(values);
   v>0 && console.log(importData.messages);
 
 });
