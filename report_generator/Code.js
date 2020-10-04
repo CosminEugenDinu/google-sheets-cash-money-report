@@ -29,7 +29,7 @@ const verbosity = interfaceSheet.getSheetValues(8,5,1,1)[0][0];
 // function to check some level against verbosity (which is set on interface)
 const v = level => verbosity === level; 
 // instantiate log function
-const log = Log(interfaceSheet, [10,5,8,3]);
+const log = Log(interfaceSheet, [10,5,15,3]);
 
 const settings = new Settings(settingsSheet, 50, 1000);
 
@@ -1209,6 +1209,8 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
 
   const fieldNames = getFieldNames(values[0]);
   v>1 && addMessage(`fieldNames are ${JSON.stringify(fieldNames)}`);
+
+  /*************
   // list of all indexes that have an associated field
   const fieldIndexes = [];
   for (const fieldName in fieldNames)
@@ -1216,11 +1218,19 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   
   const allIndexes = Array(values[0].length).fill(0).map((e,i)=>e+i);
   const nonFieldIndexes = allIndexes.filter(i => ! fieldIndexes.includes(i));
+  *************/
+  
+  // will be empty except positions of indexes o fields from fieldNames 
+  const fieldIndexes = Array(values[0].length);
 
   // field descriptions
   const validator = new FieldValidator();
   for (const fieldName in fieldNames){
     const fieldIndex = fieldNames[fieldName];
+
+    // don't forget to add this index to fieldIndexes
+    fieldIndexes[fieldIndex] = fieldIndex;
+
     if (fieldName === 'date')
       validator.setField(fieldName,fieldIndex,'Date');
     else if (fieldName === 'ref')
@@ -1261,19 +1271,20 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
       throw err;
     }
   };
-  
-  // this is a set of unique strings (hash of record)
-  // I used array for performance of "includes" and "indexOf" (node.js v14.8.0)
-  const uniques = []; 
-  // store index of unique record
-  const indexesOfUnique = [0]; // index 0 is for fieldNames
+
+  // this is a set of unique strings (key is hash of record), value is row index
+  const uniques = new Map();
+  // store first row (field names)
+  uniques.set(JSON.stringify(values[0]), 0);
+
   
   let emptyRowCount = 0;
   let row_i = 0;
+  let nonEmptyRows = 0;
   while(++row_i < values.length){
     const record = values[row_i];
 
-    // if 10 empty records are encountered then is end of data set
+    // if 10 successive empty records are encountered then is end of data set
     if (emptyRowCount > 9){
       v>1 && addMessage(`found ${emptyRowCount} empty rows, so break`); 
       break;
@@ -1281,17 +1292,21 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
     const rowIsEmpty = record.reduce((isEmpty,val)=>{
       return [NaN,'',null,undefined].includes(val) ? isEmpty : false;
     }, true);
-    if (rowIsEmpty){ ++emptyRowCount;
+    if (rowIsEmpty){
+      ++emptyRowCount;
       continue;
     }
     // if got here, then emptyRowCount < 10, so reset
     emptyRowCount = 0;
+    ++nonEmptyRows;
 
     // delete all values from fields with indexes that are not in fieldIndexes
-    record.forEach((v, i) => {
-      if (nonFieldIndexes.includes(i))
+    record.forEach((v, i) =>{
+      if (fieldIndexes[i]===undefined){
         delete record[i];
+      }
     });
+
 
     // validation begin
     for (const fieldName in fieldNames){
@@ -1325,19 +1340,26 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
     // in order to check if record is duplicate, hash it
     // and add to a set of unique values
     const recordHash = JSON.stringify(record); 
+
     // if is already in uniques, then is duplicate
-    if ( ! uniques.includes(recordHash)){
-      uniques.push(recordHash);
-      indexesOfUnique.push(row_i);
-    }
+    if ( ! uniques.has(recordHash))
+      uniques.set(recordHash, row_i);
   }
+
+  v>1 && addMessage(`Deleted all values from fieldIndexes except:[${fieldIndexes.filter(i=>i!==undefined)}]`);
   
-  v>1 && addMessage(`values.length ${values.length}`)
-  v>1 && addMessage(`uniques.length ${uniques.length}`)
+  //v>1 && addMessage(`values.length ${values.length}`)
+  v>1 && addMessage(`nonEmptyRows ${nonEmptyRows} <- without fields names row`)
+  v>1 && addMessage(`uniques.size ${uniques.size} <- this includes first row - fields names`)
 
   // now we got all indexes of unique values 
   // let't remove them by constructing a new set of values
-  const newValues = indexesOfUnique.map(i => values[i]);
+  const newValues = Array(uniques.size).fill([]);
+  let new_i = 0;
+  for (const uniqueIndex of uniques.values()){
+    newValues[new_i++] = values[uniqueIndex];
+  }
+  v>1 && addMessage(`Duplicates removed ${nonEmptyRows+1 - uniques.size}`);
   v>1 && addMessage(`newValues.length ${newValues.length} <- this includes first row - fields names`);
 
   // sort records by date except first row (index 0) - field names
@@ -1357,7 +1379,7 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
     ++start_i;
   }
   
-  v>1 && addMessage(`procedure done in ${(Date.now() - startTimer)/1000} sec`);
+  v>0 && addMessage(`procedure done in ${(Date.now() - startTimer)/1000} sec`);
   // reset values on range
   dataRange.setValues(newValues); 
   v>1 && addMessage('all new values written');
