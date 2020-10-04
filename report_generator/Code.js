@@ -986,7 +986,8 @@ function renderReport(
  */
 function importData(
   fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo, SpreadsheetApp){
-
+  
+  // import external dependencies
   const getRecords = libraryGet('getRecords');
   const addMessages = libraryGet('addMessages');
   const searchRecords = libraryGet('searchRecords');
@@ -999,9 +1000,6 @@ function importData(
 
   v>0 && addMessage('Procedure importData begin');
   v>1 && addMessage(`Company alias: ${company.get('alias')}`);
-
-  // tableName the prefix before '.' in field name, like tableName.fieldName
-  const linkTableName = 'link';
 
   // list of google sheets ids 
   const sheetIds = (dataLinks => {
@@ -1074,6 +1072,7 @@ function importData(
       v>0 && addMessage(`Duplicates found on date ${new Date(dateStr).toLocaleDateString('ro-RO')}.`);
       v>1 && addMessage('resolving same-date-key conflicts...');
       const mergedDateRecords = mergeDateRecords(foundDateRecords, existingDateRecords);
+
       existingRecords.set(dateStr, mergedDateRecords);
     } else if (foundDateRecords){
       existingRecords.set(dateStr, foundDateRecords);
@@ -1081,31 +1080,43 @@ function importData(
   }
 
   v>1 && addMessage('updating raw data sheet...')
-  const rawValues = [];
+  const targetRange = sheetToImportTo.getRange('A1:F');
+  const targetValues = targetRange.getValues();
+  const targetFieldNames = getFieldNames(targetValues[0]);
+
+  // delete all existing records
+  targetRange.clear();
+  v>1 && addMessage(`Deleted all 'A1:F' values from sheet ${sheetToImportTo.getName()}!`); 
+  // writing new values
+
+  const rawNewValues = []; 
+  // copy field names
+  rawNewValues.push(targetValues[0].map(elem=>elem));
+
   const keyDates = Array.from(existingRecords.keys()).sort();
   keyDates.forEach(
     dateStr => {
       for (const record of existingRecords.get(dateStr)){ 
-        rawValues.push(
-          [new Date(dateStr),
-          record.get('ref'),
-          record.get('doc_type'),
-          record.get('descr'),
-          record.get('I_O_type'),
-          record.get('value')]
-        );
+        const newRecord = Array(targetValues[0].length);
+        for (const fieldName in targetFieldNames){
+          const fieldIndex = targetFieldNames[fieldName];
+          if (fieldName === 'date')
+            newRecord[fieldIndex] = new Date(dateStr);
+          else
+            newRecord[fieldIndex] = record.get(fieldName);
+        }
+        rawNewValues.push(newRecord);
       }
     }
   );
-
-  const rawDataRange = sheetToImportTo.getRange(2, 1, rawValues.length, rawValues[0].length);
-  // delete all existing records
-  sheetToImportTo.getRange('A2:F').clear();
-  v>1 && addMessage(`Deleted all 'A2:F' values from sheet ${sheetToImportTo.getName()}!`); 
-  // writing new values
   
   v>1 && addMessage(`Writing new values...`);
-  rawDataRange.setValues(rawValues);
+
+  // expand rawNewValues to match existing range
+  const newToAdd = targetValues.length - rawNewValues.length;
+  for (let i=0; i<newToAdd; i++)
+    rawNewValues.push(Array(targetValues[0].length));
+  targetRange.setValues(rawNewValues);
 
   v>0 && addMessage('Procedure importData END');
 } // importData END
@@ -1130,8 +1141,7 @@ function searchRecords(spreadsheet, identifierPattern, rowLim=50, colLim=6){
   // pattern to search against 
   //const identifierRe = /=RIGHT\(CELL\("filename",A\d\),LEN\(CELL\("filename",A\d\)\)-FIND\("\]",CELL\("filename",A\d\)\)\)/;
   const identifierRe = new RegExp(identifierPattern);
-  addMessage(`identiferPattern is    ${identifierPattern}   `);
-  addMessage(identifierRe);
+  v>1 && addMessage(`identiferPattern is    ${identifierPattern}   `);
 
   for (const sheet of spreadsheet.getSheets()){
     const sheetRecords = [];
@@ -1143,26 +1153,17 @@ function searchRecords(spreadsheet, identifierPattern, rowLim=50, colLim=6){
 
     // iterate over first column and search for pattern
     let row_i = -1;
-    addMessage(`formulas.length: ${formulas.length}`);
     while(++row_i < formulas.length){
-      addMessage(`formula to match against is ${formulas[row_i][0]}`);
-      addMessage(`typeof formula is ${typeof formulas[row_i][0]}`);
-
       // if pattern is found, then look 5 columns right for record
       if (formulas[row_i][0].match(identifierRe)){
-        addMessage(`Matched formula ${formulas[row_i][0]}`);
         // if record has at least one value, then is a valid record 
         const [record] = sheet.getSheetValues(row_i+1, 2, 1, colLim-1);
-        addMessage('record');
-        sheetRecords.push(record);
-        /*
-        if (isValidRecord(record)){
-          sheetRecords.push(record);
-          addMessage(`Valid record`);
-        }
-        else
-          addMessage(`Not valid record`);
-        */
+        let isValidRecord = false;
+        record.forEach(elem => {
+          if ( ! [NaN, undefined, null, ''].includes(elem))
+            isValidRecord = true;
+        });
+        if (isValidRecord)  sheetRecords.push(record);
       } else {
         addMessage(`Pattern not match`);
       }

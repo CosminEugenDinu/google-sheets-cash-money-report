@@ -312,7 +312,7 @@ tests.set('validateRecord', () => {
 
 tests.set('cleanRawData', () => {
   // set verbosity to 0...2
-  const v = 2;
+  const v = 0;
   cleanRawData.verbosity = v;
 
   for (const [correctable_case, correct_case] of [
@@ -514,7 +514,7 @@ tests.set('getRecords', () => {
 });
 
 tests.set('importData', () => {
-  const v = 2; // verbosity
+  let v = 0; // verbosity
   v > 0 && console.log('testing importData procedure...');
 
   const pattern = `=RIGHT(CELL("filename",A12),LEN(CELL("filename",A12))-FIND("]",CELL("filename",A12)))`;
@@ -523,35 +523,35 @@ tests.set('importData', () => {
 
   // 01.09.2015
   const sourceValues1 = [
-  ...Array(10).fill(Array(6)),
-  [          ,        ,     ,                        ,          ,       ,],
-  [          ,'REGISTRUL DE CASĂ', ,                 ,          ,       ,],
-  ['DOCUMENT',     ,     ,'EXPLICAȚII'               ,'INCASĂRI','PLĂȚI',],
-  ['DATA'    ,    'NR','TIP',                        ,          ,       ,],
-  [          ,        ,     ,'SOLD LUNA PRECEDENTĂ:' ,   1812.23,       ,],
-  [pattern   ,'Z:0156','FAE','INCASARI SERVICII'     ,    233.00,       ,],
-  [pattern   ,      10,'CHI','CHIRIE SEPTEMBRIE 2015',          ,2000.00,],
-  [          ,        ,     ,                        ,          ,       ,],
-  [          ,        ,     ,'=F(A1:B2)'             ,   2045.23,2000.00,],
-  [          ,        ,     ,'=F(A1:B2)'             ,     45.23,       ,],
-  ...Array(20).fill(Array(6)),
+    ...Array(10).fill(Array(6)),
+    [          ,        ,     ,                        ,          ,       ,],
+    [          ,'REGISTRUL DE CASĂ', ,                 ,          ,       ,],
+    ['DOCUMENT',     ,     ,'EXPLICAȚII'               ,'INCASĂRI','PLĂȚI',],
+    ['DATA'    ,    'NR','TIP',                        ,          ,       ,],
+    [          ,        ,     ,'SOLD LUNA PRECEDENTĂ:' ,   1812.23,       ,],
+    [pattern   ,'Z:0156','FAE','INCASARI SERVICII'     ,    233.00,       ,],
+    [pattern   ,      10,'CHI','CHIRIE SEPTEMBRIE 2015',          ,2000.00,],
+    [          ,        ,     ,                        ,          ,       ,],
+    [          ,        ,     ,'=F(A1:B2)'             ,   2045.23,2000.00,],
+    [          ,        ,     ,'=F(A1:B2)'             ,     45.23,       ,],
+    ...Array(20).fill(Array(6)),
   ];
 
   // 02.09.2015
   const sourceValues2 = [
-  ...Array(10).fill(Array(6)),
-  [          ,        ,     ,                        ,          ,       ,],
-  [          ,'REGISTRUL DE CASĂ', ,                 ,          ,       ,],
-  ['DOCUMENT',     ,     ,'EXPLICAȚII'               ,'INCASĂRI','PLĂȚI',],
-  ['DATA'    ,    'NR','TIP',                        ,          ,       ,],
-  [          ,        ,     ,'SOLD LUNA PRECEDENTĂ:' ,     45.23,       ,],
-  [pattern   ,'Z:0157','FAE','INCASARI SERVICII'     ,    173.00,       ,],
-  [pattern   ,      26,'FAE','IMPRUMUT NUMERAR'      ,    450.00,       ,],
-  [pattern   ,15003905,'CHI','XEROX COLOTECH+ A4 90g/mp',       , 521.73,],
-  [          ,        ,     ,                        ,          ,       ,],
-  [          ,        ,     ,'=F(A1:B2)'             ,    668.23, 521.73,],
-  [          ,        ,     ,'=F(A1:B2)'             ,    146.50,       ,],
-  ...Array(20).fill(Array(6)),
+    ...Array(10).fill(Array(6)),
+    [          ,        ,     ,                        ,          ,       ,],
+    [          ,'REGISTRUL DE CASĂ', ,                 ,          ,       ,],
+    ['DOCUMENT',     ,     ,'EXPLICAȚII'               ,'INCASĂRI','PLĂȚI',],
+    ['DATA'    ,    'NR','TIP',                        ,          ,       ,],
+    [          ,        ,     ,'SOLD LUNA PRECEDENTĂ:' ,     45.23,       ,],
+    [pattern   ,'Z:0157','FAE','INCASARI SERVICII'     ,    173.00,       ,],
+    [pattern   ,      26,'FAE','IMPRUMUT NUMERAR'      ,    450.00,       ,],
+    [pattern   ,15003905,'CHI','XEROX COLOTECH+ A4 90g/mp',       , 521.73,],
+    [          ,        ,     ,                        ,          ,       ,],
+    [          ,        ,     ,'=F(A1:B2)'             ,    668.23, 521.73,],
+    [          ,        ,     ,'=F(A1:B2)'             ,    146.50,       ,],
+    ...Array(20).fill(Array(6)),
   ];
   // mocks
   const id1 = '1e0nIxg2pNLnnSPmKdmkRHS7cl7kVEj2G9CKBksXflEk';
@@ -594,17 +594,16 @@ tests.set('importData', () => {
       // partially implemented: for now only returns values
       // if implemented, arguments will describe dimensions of values
       const sheetValues = Array(numOfRows).fill(Array(numOfCols));
-      for (let i=row-1; i <= numOfRows; i++){
-        for (let j=col-1; j <= numOfCols; j++){
-          sheetValues[i][j] = values[i][j];
+      for (let i=0; i < numOfRows; i++){
+        for (let j=0; j < numOfCols; j++){
+          sheetValues[i][j] = values[row+i-1][col+j-1];
         }
       }
-      console.log(sheetValues);
       return sheetValues;
     }
     return getSheetValues;
   };
-
+  //v = 0;
   const sourceSheet1 = {
     getName(){return '01.09.2015';},
     getRange(){return sourceRange1;},
@@ -625,14 +624,14 @@ tests.set('importData', () => {
   let values = [];
   const targetRange = {
     getValues(){return values;},
-    setValues(values){values = values;},clear(){return targetRange;},
+    setValues(newValues){values = newValues;},clear(){return targetRange;},
   };
   const targetSheet = {
     getName(){return 'target_sheet_name';},
     getRange(){return targetRange;}
   };
 
-  const fromDate=new Date(2015,8,1), toDate=new Date(2015,8.2);
+  const fromDate=new Date(2015,8,1), toDate=new Date(2015,8,2);
   const company = ((company)=>{
     company.set('alias', 'colibri'); return company;})(new Map());
   const dataLinks = [link1];
@@ -645,48 +644,45 @@ tests.set('importData', () => {
   
   values = [
     ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
-    ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
+    ['ref8',,,new Date(2015,8,1),'docType8','descr8','unknown',0,,26,,,],
     // after calling importData, this array should look like next importData_newValues
   ];
-  importData.verbosity = v;
-  console.log('----------------------------------');
-  console.log(values);
-  importData(...args);
-  v>0 && console.log(importData.messages);
-  console.log('----------------------------------');
-
   const importData_newValues = [
     ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
-    ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
     // 01.09.2015
-    ['Z:0156',,,'01.09.2015','FAE','INCASARI SERVICII',,1,,233.00,,,],
     //[pattern   ,'Z:0156','FAE','INCASARI SERVICII'     ,    233.00,       ,],
-    [10,,,'01.09.2015','CHI','CHIRIE SEPTEMBRIE 2015',,0,,2000.00,,,],
+    ['Z:0156',,,new Date(2015,8,1),'FAE','INCASARI SERVICII',undefined,1,,233.00,,,],
     //[pattern   ,      10,'CHI','CHIRIE SEPTEMBRIE 2015',          ,2000.00,],
+    [10,,,new Date(2015,8,1),'CHI','CHIRIE SEPTEMBRIE 2015',undefined,0,,2000.00,,,],
+    ['ref8',,,new Date(2015,8,1),'docType8','descr8',undefined,0,,26,,,],
     // 02.09.2015
-    ['Z:0157',,,'02.09.2015','FAE','INCASARI SERVICII',,1,,173.00,,,],
     //[pattern   ,'Z:0157','FAE','INCASARI SERVICII'     ,    173.00,       ,],
-    [26,,,'02.09.2015','FAE','IMPRUMUT NUMERAR',,0,,450.00,,,],
+    ['Z:0157',,,new Date(2015,8,2),'FAE','INCASARI SERVICII',undefined,1,,173.00,,,],
     //[pattern   ,      26,'FAE','IMPRUMUT NUMERAR'      ,    450.00,       ,],
-    [15003905,,,'02.09.2015','CHI','XEROX COLOTECH+ A4 90g/mp',,0,,521.73,,,],
+    [26,,,new Date(2015,8,2),'FAE','IMPRUMUT NUMERAR',undefined,1,,450.00,,,],
     //[pattern   ,15003905,'CHI','XEROX COLOTECH+ A4 90g/mp',       , 521.73,],
+    [15003905,,,new Date(2015,8,2),'CHI','XEROX COLOTECH+ A4 90g/mp',undefined,0,,521.73,,,],
   ];
-  //assert.deepStrictEqual(values, importData_newValues);
+
+  importData.verbosity = v;
+  importData(...args);
+  assert.deepStrictEqual(values, importData_newValues);
+  v>0 && console.log(importData.messages);
 
   values = [
     ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
     ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
     ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
-    ...Array(5).fill(Array(values[0].length)),
+    ...Array(5).fill(Array(12)),
     ['ref8',,,new Date(2015,1,28),'docType8','descr7','unknown',0,,26,,,],
     ['ref8',,,new Date(2016,1,27),'docType8','descr8','unknown',0,,26,,,],
     ['ref8',,,new Date(2016,1,27),'docType8','descr8','unknown',0,,26,,,],
-    ...Array(20).fill(Array(values[0].length)),
+    ...Array(20).fill(Array(12)),
     ];
   values = [
     ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
     ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
-    ...Array(20).fill(Array(values[0].length)),
+    ...Array(20).fill(Array(12)),
   ]
   //values = [];
 
