@@ -1294,20 +1294,11 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
       throw err;
     }
   };
-<<<<<<< HEAD
-  
-  // this is a set of unique strings (hash of record)
-  const uniques = []; 
-  // store index of unique record
-  const indexesOfUnique = [0]; // index 0 is for fieldNames
-=======
 
   // this is a set of unique strings (key is hash of record), value is row index
   const uniques = new Map();
   // store first row (field names)
   uniques.set(JSON.stringify(values[0]), 0);
-
->>>>>>> origin/master
   
   let emptyRowCount = 0;
   let row_i = 0;
@@ -1379,16 +1370,6 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
 
   v>1 && addMessage(`Deleted all values from fieldIndexes except:[${fieldIndexes.filter(i=>i!==undefined)}]`);
   
-<<<<<<< HEAD
-  v>1 && addMessage(`values.length ${values.length}`)
-  v>1 && addMessage(`uniques.size ${uniques.size}`)
-
-  // now we got all indexes of unique values 
-  // let't remove them by constructing a new set of values
-  const newValues = indexesOfUnique.map(i => values[i]);
-
-=======
-  //v>1 && addMessage(`values.length ${values.length}`)
   v>1 && addMessage(`nonEmptyRows ${nonEmptyRows} <- without fields names row`)
   v>1 && addMessage(`uniques.size ${uniques.size} <- this includes first row - fields names`)
 
@@ -1399,8 +1380,8 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   for (const uniqueIndex of uniques.values()){
     newValues[new_i++] = values[uniqueIndex];
   }
+
   v>1 && addMessage(`Duplicates removed ${nonEmptyRows+1 - uniques.size}`);
->>>>>>> origin/master
   v>1 && addMessage(`newValues.length ${newValues.length} <- this includes first row - fields names`);
 
   // sort records by date except first row (index 0) - field names
