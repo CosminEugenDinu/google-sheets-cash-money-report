@@ -521,6 +521,7 @@ tests.set('importData', () => {
 
   const identifierRePat = '\=RIGHT\\(CELL\\("filename",A\\d{1,2}\\),LEN\\(CELL\\("filename",A\\d{1,2}\\)\\)-FIND\\("\\]",CELL\\("filename",A\\d{1,2}\\)\\)\\)';
 
+  // 01.09.2015
   const sourceValues1 = [
   ...Array(10).fill(Array(6)),
   [          ,        ,     ,                        ,          ,       ,],
@@ -536,6 +537,7 @@ tests.set('importData', () => {
   ...Array(20).fill(Array(6)),
   ];
 
+  // 02.09.2015
   const sourceValues2 = [
   ...Array(10).fill(Array(6)),
   [          ,        ,     ,                        ,          ,       ,],
@@ -588,10 +590,16 @@ tests.set('importData', () => {
   // this function return closure getSheetValues
   const getSheetValuesGenerator = values => {
     // function getSheetValues will be a method of Sheet object
-    const getSheetValues = (x,y,xOffset,yOffset) => {
+    const getSheetValues = (row,col,numOfRows,numOfCols) => {
       // partially implemented: for now only returns values
       // if implemented, arguments will describe dimensions of values
-      return values;
+      const sheetValues = Array(numOfRows).fill(Array(numOfCols));
+      for (let i=row-1; i <= numOfRows; i++){
+        for (let j=col-1; j <= numOfCols; j++){
+          sheetValues[i][j] = values[i][j];
+        }
+      }
+      return sheetValues;
     }
     return getSheetValues;
   };
@@ -623,7 +631,7 @@ tests.set('importData', () => {
     getRange(){return targetRange;}
   };
 
-  const fromDate=new Date(), toDate=new Date();
+  const fromDate=new Date(2015,8,1), toDate=new Date(2015,8.2);
   const company = ((company)=>{
     company.set('alias', 'colibri'); return company;})(new Map());
   const dataLinks = [link1];
@@ -640,7 +648,12 @@ tests.set('importData', () => {
     // after calling importData, this array should look like next importData_newValues
   ];
   importData.verbosity = v;
+  console.log('----------------------------------');
+  console.log(values);
   importData(...args);
+  v>0 && console.log(importData.messages);
+  console.log('----------------------------------');
+
   const importData_newValues = [
     ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
     ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
@@ -675,10 +688,6 @@ tests.set('importData', () => {
     ...Array(20).fill(Array(values[0].length)),
   ]
   //values = [];
-  console.log('................. after call importDate ...................')
-  console.log(values);
-
-  v>0 && console.log(importData.messages);
 
 });
 
