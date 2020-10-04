@@ -517,43 +517,39 @@ tests.set('importData', () => {
   const v = 2; // verbosity
   v > 0 && console.log('testing importData procedure...');
 
-  //const pattern = `=RIGHT(CELL("filename",A11),LEN(CELL("filename",A11))-FIND("]",CELL("filename",A11)))`;
-  const pattern = `=RIGHT(CELL("filename",A12),LEN(CELL("filename",A12))-FIND("]",CELL("filename",Ad12)))`;
+  const pattern = `=RIGHT(CELL("filename",A12),LEN(CELL("filename",A12))-FIND("]",CELL("filename",A12)))`;
 
-  //const pattern = 'ceva';
-  //const identifierRePat = 'ceva';
-  //const identifierRe = /=RIGHT\(CELL\("filename",A\d\),LEN\(CELL\("filename",A\d\)\)-FIND\("\]",CELL\("filename",A\d\)\)\)/;
   const identifierRePat = '\=RIGHT\\(CELL\\("filename",A\\d{1,2}\\),LEN\\(CELL\\("filename",A\\d{1,2}\\)\\)-FIND\\("\\]",CELL\\("filename",A\\d{1,2}\\)\\)\\)';
 
   const sourceValues1 = [
-...Array(10).fill(Array(6)),
-[          ,        ,     ,                        ,          ,       ,],
-[          ,'REGISTRUL DE CASĂ', ,                 ,          ,       ,],
-['DOCUMENT',     ,     ,'EXPLICAȚII'               ,'INCASĂRI','PLĂȚI',],
-['DATA'    ,    'NR','TIP',                        ,          ,       ,],
-[          ,        ,     ,'SOLD LUNA PRECEDENTĂ:' ,   1812.23,       ,],
-[pattern   ,'Z:0156','FAE','INCASARI SERVICII'     ,    233.00,       ,],
-[pattern   ,      10,'CHI','CHIRIE SEPTEMBRIE 2015',          ,2000.00,],
-[          ,        ,     ,                        ,          ,       ,],
-[          ,        ,     ,'=F(A1:B2)'             ,   2045.23,2000.00,],
-[          ,        ,     ,'=F(A1:B2)'             ,     45.23,       ,],
-...Array(20).fill(Array(6)),
+  ...Array(10).fill(Array(6)),
+  [          ,        ,     ,                        ,          ,       ,],
+  [          ,'REGISTRUL DE CASĂ', ,                 ,          ,       ,],
+  ['DOCUMENT',     ,     ,'EXPLICAȚII'               ,'INCASĂRI','PLĂȚI',],
+  ['DATA'    ,    'NR','TIP',                        ,          ,       ,],
+  [          ,        ,     ,'SOLD LUNA PRECEDENTĂ:' ,   1812.23,       ,],
+  [pattern   ,'Z:0156','FAE','INCASARI SERVICII'     ,    233.00,       ,],
+  [pattern   ,      10,'CHI','CHIRIE SEPTEMBRIE 2015',          ,2000.00,],
+  [          ,        ,     ,                        ,          ,       ,],
+  [          ,        ,     ,'=F(A1:B2)'             ,   2045.23,2000.00,],
+  [          ,        ,     ,'=F(A1:B2)'             ,     45.23,       ,],
+  ...Array(20).fill(Array(6)),
   ];
 
   const sourceValues2 = [
-...Array(10).fill(Array(6)),
-[          ,        ,     ,                        ,          ,       ,],
-[          ,'REGISTRUL DE CASĂ', ,                 ,          ,       ,],
-['DOCUMENT',     ,     ,'EXPLICAȚII'               ,'INCASĂRI','PLĂȚI',],
-['DATA'    ,    'NR','TIP',                        ,          ,       ,],
-[          ,        ,     ,'SOLD LUNA PRECEDENTĂ:' ,     45.23,       ,],
-[pattern   ,'Z:0157','FAE','INCASARI SERVICII'     ,    173.00,       ,],
-[pattern   ,      26,'FAE','IMPRUMUT NUMERAR'      ,    450.00,       ,],
-[pattern   ,15003905,'CHI','XEROX COLOTECH+ A4 90g/mp',       , 521.73,],
-[          ,        ,     ,                        ,          ,       ,],
-[          ,        ,     ,'=F(A1:B2)'             ,    668.23, 521.73,],
-[          ,        ,     ,'=F(A1:B2)'             ,    146.50,       ,],
-...Array(20).fill(Array(6)),
+  ...Array(10).fill(Array(6)),
+  [          ,        ,     ,                        ,          ,       ,],
+  [          ,'REGISTRUL DE CASĂ', ,                 ,          ,       ,],
+  ['DOCUMENT',     ,     ,'EXPLICAȚII'               ,'INCASĂRI','PLĂȚI',],
+  ['DATA'    ,    'NR','TIP',                        ,          ,       ,],
+  [          ,        ,     ,'SOLD LUNA PRECEDENTĂ:' ,     45.23,       ,],
+  [pattern   ,'Z:0157','FAE','INCASARI SERVICII'     ,    173.00,       ,],
+  [pattern   ,      26,'FAE','IMPRUMUT NUMERAR'      ,    450.00,       ,],
+  [pattern   ,15003905,'CHI','XEROX COLOTECH+ A4 90g/mp',       , 521.73,],
+  [          ,        ,     ,                        ,          ,       ,],
+  [          ,        ,     ,'=F(A1:B2)'             ,    668.23, 521.73,],
+  [          ,        ,     ,'=F(A1:B2)'             ,    146.50,       ,],
+  ...Array(20).fill(Array(6)),
   ];
   // mocks
   const id1 = '1e0nIxg2pNLnnSPmKdmkRHS7cl7kVEj2G9CKBksXflEk';
@@ -633,14 +629,36 @@ tests.set('importData', () => {
   const dataLinks = [link1];
   const identifierPattern = identifierRePat;
   const sheetToImportTo = targetSheet;
-  // mocks END
+  // mocks END ==================================
 
   const args = [
     fromDate,toDate,company,dataLinks,identifierPattern,sheetToImportTo,SpreadsheetApp];
-
+  
   values = [
     ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
+    ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
+    // after calling importData, this array should look like next importData_newValues
   ];
+  importData.verbosity = v;
+  importData(...args);
+  const importData_newValues = [
+    ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
+    ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
+    // 01.09.2015
+    ['Z:0156',,,'01.09.2015','FAE','INCASARI SERVICII',,1,,233.00,,,],
+    //[pattern   ,'Z:0156','FAE','INCASARI SERVICII'     ,    233.00,       ,],
+    [10,,,'01.09.2015','CHI','CHIRIE SEPTEMBRIE 2015',,0,,2000.00,,,],
+    //[pattern   ,      10,'CHI','CHIRIE SEPTEMBRIE 2015',          ,2000.00,],
+    // 02.09.2015
+    ['Z:0157',,,'02.09.2015','FAE','INCASARI SERVICII',,1,,173.00,,,],
+    //[pattern   ,'Z:0157','FAE','INCASARI SERVICII'     ,    173.00,       ,],
+    [26,,,'02.09.2015','FAE','IMPRUMUT NUMERAR',,0,,450.00,,,],
+    //[pattern   ,      26,'FAE','IMPRUMUT NUMERAR'      ,    450.00,       ,],
+    [15003905,,,'02.09.2015','CHI','XEROX COLOTECH+ A4 90g/mp',,0,,521.73,,,],
+    //[pattern   ,15003905,'CHI','XEROX COLOTECH+ A4 90g/mp',       , 521.73,],
+  ];
+  //assert.deepStrictEqual(values, importData_newValues);
+
   values = [
     ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
     ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
@@ -657,10 +675,9 @@ tests.set('importData', () => {
     ...Array(20).fill(Array(values[0].length)),
   ]
   //values = [];
-  importData.verbosity = v;
-  importData(...args);
   console.log('................. after call importDate ...................')
   console.log(values);
+
   v>0 && console.log(importData.messages);
 
 });
