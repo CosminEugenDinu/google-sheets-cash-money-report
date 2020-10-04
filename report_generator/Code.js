@@ -115,7 +115,8 @@ if (procedure==='importData'){
       sheet => sheet.getName() === company.get('alias')+RAWDATA_SHEET_SUFFIX
       );
 
-    args = [fromDate, toDate, company, dataLinks, identifierPattern, sheetToImportTo];
+    args = [
+      fromDate,toDate,company,dataLinks,identifierPattern,sheetToImportTo,SpreadsheetApp];
 
   } catch(e){
     throw new Error(
@@ -133,8 +134,7 @@ if (procedure==='importData'){
     throw new Error(`Procedure ${procedure} failed with:\n${e.message}`+
     `\nComplete Error object is:\n${JSON.stringify(e)}`);
   }
-  if (messages)
-    for (const [msg, count] of messages) log(count, msg);
+  if (messages) for (const [msg,count] of messages){ log(count, msg);}
 }
 
 //---------------------------------------------------------------------------------
@@ -202,92 +202,13 @@ function areTheSame(map_1, map_2){
 }
 
 /**
- * @param {Spreadsheet} spreadsheet
- * @param {Number} rowLim - maximum number of rows to search
- * @param {Number} colLim - maximum number of columns to search
- * @returns {Map} records
- *      - {string} keys - dates (ISO 8601)
- *      - {Array} values - of {Map} records, like {'date'=>{Date}, 'ref'=>32, etc.} 
- */
-function searchRecords(spreadsheet, identifierPattern, rowLim=50, colLim=6){
-  const records = new Map();
-
-  // measurements
-  const messages = new Map();
-
-  // pattern to search against 
-  //const identifierRe = /=RIGHT\(CELL\("filename",A\d\),LEN\(CELL\("filename",A\d\)\)-FIND\("\]",CELL\("filename",A\d\)\)\)/;
-  const identifierRe = new RegExp(identifierPattern);
-
-  for (const sheet of spreadsheet.getSheets()){
-    
-    const sheetRecords = [];
-    
-    // looks in first column for identifier (which is a formula)
-    const searchRange = sheet.getRange(1,1,rowLim,1);
-    // {Array[][]} formulas
-    const formulas = searchRange.getFormulas();
-
-    // iterate over first column and search for pattern
-    let row_i = -1;
-    while(++row_i < formulas.length){
-      // if pattern is found, then look 5 columns right for record
-      if (formulas[row_i][0].match(identifierRe)){
-        // if record has at least one value, then is a valid record 
-        const [record] = sheet.getSheetValues(row_i+1, 2, 1, colLim-1);
-        isValidRecord(record) && sheetRecords.push(record);
-      }
-    }
-    
-
-    // if some records were found, add them to {Map} records 
-    if (sheetRecords.length){
-      // assume sheetName is a date string like '01.02.2020'; 
-      const [d, m, y] = sheet.getName().split('.');
-      const dateStr = new Date(+y, +m-1, +d).toJSON();
-      records.set(dateStr, []);
-
-      sheetRecords.map(
-        record => {
-          const recordMap = new Map();
-          const [ref, doc_type, descr, input, output] = record;
-
-          recordMap.set('date', dateStr);
-          recordMap.set('ref', ref || null);
-          recordMap.set('doc_type', doc_type || null);
-          recordMap.set('descr', descr || null);
-          if (input)
-            recordMap.set('I_O_type', 1);
-          else if (output)
-            recordMap.set('I_O_type', 0);
-          recordMap.set('value', input || output || null);
-
-          records.get(dateStr).push(recordMap);
-        }
-      );
-     
-    } else {
-      const message = 'Records not found';
-      if (messages.has(message))
-        messages.get(message).push({sheet: sheet.getName(), spreadsheet: spreadsheet.getName()})  
-      else
-        messages.set(message, []);
-    }
-  }
-
-// log accumulated messages
-//messages.forEach((vals, mess) => v(1) && log(mess, vals.length, JSON.stringify(vals)));
-return records;
-}
-
-/**
  * Verifies if a record is valid
  * 
  * @param {Array[]} record - contains three values
  * @returns {Boolean} isValid 
  */
+/*
 function isValidRecord(record){
-
   const len = 5;
   if (record.length !== len) return false;
 
@@ -298,6 +219,7 @@ function isValidRecord(record){
 
   return false;
 }
+*/
 
 /**
  * @param {string} link - google sheet url link
@@ -480,7 +402,7 @@ function defaultTemplate(){
   return TEMPLATE;
 }
 
-
+// ================================== LIBRARY ===================================
 function libraryGet(required){
 
 // library members dictionary
@@ -501,10 +423,13 @@ function addMessages(procedure){
 
   procedure.messages = new Map();
 
-  const addMessage = message =>
-    procedure.messages.has(message) ?
-      ++procedure.messages.get(message)[0] :
+  const addMessage = message => {
+    if (procedure.messages.has(message))
+      ++procedure.messages.get(message)[0]
+    else
       procedure.messages.set(message,[1]);
+    return true; // allows chaining
+  }
 
   return addMessage;
 }
@@ -1064,6 +989,7 @@ function importData(
 
   const getRecords = libraryGet('getRecords');
   const addMessages = libraryGet('addMessages');
+  const searchRecords = libraryGet('searchRecords');
 
   // initialize debug messaging
   const thisProcedure = importData;
@@ -1119,9 +1045,11 @@ function importData(
 
   const foundRecords = new Map(); 
   for (const sheet of srcSpreadsheets){
+    searchRecords.verbosity = v;
     for (const [dateStr, record] of searchRecords(sheet, identifierPattern)){
       foundRecords.set(dateStr, record);
     }
+    if (searchRecords.messages) addMessage(searchRecords.messages);
   }
 
   if (!foundRecords.size)
@@ -1183,13 +1111,104 @@ function importData(
 } // importData END
 
 /**
+ * @param {Spreadsheet} spreadsheet
+ * @param {Number} rowLim - maximum number of rows to search
+ * @param {Number} colLim - maximum number of columns to search
+ * @returns {Map} records
+ *      - {string} keys - dates (ISO 8601)
+ *      - {Array} values - of {Map} records, like {'date'=>{Date}, 'ref'=>32, etc.} 
+ */
+function searchRecords(spreadsheet, identifierPattern, rowLim=50, colLim=6){
+  const records = new Map();
+
+  // initialize debug messaging
+  const thisProcedure = searchRecords;
+  const addMessage = addMessages(thisProcedure); // adds prop {Map} messages
+  // @prop {number} verbosity could be added at procedure call
+  const v = thisProcedure.verbosity ? thisProcedure.verbosity : 0;
+
+  // pattern to search against 
+  //const identifierRe = /=RIGHT\(CELL\("filename",A\d\),LEN\(CELL\("filename",A\d\)\)-FIND\("\]",CELL\("filename",A\d\)\)\)/;
+  const identifierRe = new RegExp(identifierPattern);
+  addMessage(`identiferPattern is    ${identifierPattern}   `);
+  addMessage(identifierRe);
+
+  for (const sheet of spreadsheet.getSheets()){
+    const sheetRecords = [];
+    
+    // looks in first column for identifier (which is a formula)
+    const searchRange = sheet.getRange(1,1,rowLim,1);
+    // {Array[][]} formulas
+    const formulas = searchRange.getFormulas();
+
+    // iterate over first column and search for pattern
+    let row_i = -1;
+    addMessage(`formulas.length: ${formulas.length}`);
+    while(++row_i < formulas.length){
+      addMessage(`formula to match against is ${formulas[row_i][0]}`);
+      addMessage(`typeof formula is ${typeof formulas[row_i][0]}`);
+
+      // if pattern is found, then look 5 columns right for record
+      if (formulas[row_i][0].match(identifierRe)){
+        addMessage(`Matched formula ${formulas[row_i][0]}`);
+        // if record has at least one value, then is a valid record 
+        const [record] = sheet.getSheetValues(row_i+1, 2, 1, colLim-1);
+        addMessage('record');
+        sheetRecords.push(record);
+        /*
+        if (isValidRecord(record)){
+          sheetRecords.push(record);
+          addMessage(`Valid record`);
+        }
+        else
+          addMessage(`Not valid record`);
+        */
+      } else {
+        addMessage(`Pattern not match`);
+      }
+    }
+
+    // if some records were found, add them to {Map} records 
+    if (sheetRecords.length){
+      // assume sheetName is a date string like '01.02.2020'; 
+      const [d, m, y] = sheet.getName().split('.');
+      const dateStr = new Date(+y, +m-1, +d).toJSON();
+      records.set(dateStr, []);
+
+      sheetRecords.map(
+        record => {
+          const recordMap = new Map();
+          const [ref, doc_type, descr, input, output] = record;
+
+          recordMap.set('date', dateStr);
+          recordMap.set('ref', ref || null);
+          recordMap.set('doc_type', doc_type || null);
+          recordMap.set('descr', descr || null);
+          if (input)
+            recordMap.set('I_O_type', 1);
+          else if (output)
+            recordMap.set('I_O_type', 0);
+          recordMap.set('value', input || output || null);
+
+          records.get(dateStr).push(recordMap);
+        }
+      );
+     
+    } else {
+      v>1 && addMessage(
+        `Records not found in sheet ${sheet.getName()}, spreadsheet ${spreadsheet.getName()}`);
+    }
+  }
+return records;
+} // searchRecords END
+
+/**
  * @param {Date} fromDate
  * @param {Date} toDate
  * @param {Map} company - dict with company info keys like 'name', 'alias', etc
  * @param {Sheet} rawDataSheet
  */
 function cleanRawData(fromDate, toDate, company, rawDataSheet){
-
   const getFieldNames = libraryGet('getFieldNames');
   const FieldValidator = libraryGet('FieldValidator');
   const getType = libraryGet('getType');
@@ -1267,7 +1286,6 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   };
   
   // this is a set of unique strings (hash of record)
-  // I used array for performance of "includes" and "indexOf" (node.js v14.8.0)
   const uniques = []; 
   // store index of unique record
   const indexesOfUnique = [0]; // index 0 is for fieldNames
@@ -1337,11 +1355,12 @@ function cleanRawData(fromDate, toDate, company, rawDataSheet){
   }
   
   v>1 && addMessage(`values.length ${values.length}`)
-  v>1 && addMessage(`uniques.length ${uniques.length}`)
+  v>1 && addMessage(`uniques.size ${uniques.size}`)
 
   // now we got all indexes of unique values 
   // let't remove them by constructing a new set of values
   const newValues = indexesOfUnique.map(i => values[i]);
+
   v>1 && addMessage(`newValues.length ${newValues.length} <- this includes first row - fields names`);
 
   // sort records by date except first row (index 0) - field names
@@ -1858,6 +1877,7 @@ function dummy_func(ceva){
 library.set('settings', Settings);
 library.set('renderReport', renderReport);
 library.set('importData', importData);
+library.set('searchRecords', searchRecords);
 library.set('cleanRawData', cleanRawData);
 library.set('validateRecord', validateRecord);
 library.set('getFieldNames', getFieldNames);
