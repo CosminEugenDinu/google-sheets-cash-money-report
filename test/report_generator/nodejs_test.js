@@ -624,7 +624,10 @@ tests.set('importData', () => {
   let values = [];
   const targetRange = {
     getValues(){return values;},
-    setValues(newValues){values = newValues;},clear(){return targetRange;},
+    setValues(newValues){values = newValues;},
+    clear(){
+      values.length = 0;
+      return targetRange;},
   };
   const targetSheet = {
     getName(){return 'target_sheet_name';},
@@ -649,12 +652,12 @@ tests.set('importData', () => {
   ];
   const importData_newValues = [
     ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
+    ['ref8',,,new Date(2015,8,1),'docType8','descr8',undefined,0,,26,,,],
     // 01.09.2015
     //[pattern   ,'Z:0156','FAE','INCASARI SERVICII'     ,    233.00,       ,],
     ['Z:0156',,,new Date(2015,8,1),'FAE','INCASARI SERVICII',undefined,1,,233.00,,,],
     //[pattern   ,      10,'CHI','CHIRIE SEPTEMBRIE 2015',          ,2000.00,],
     [10,,,new Date(2015,8,1),'CHI','CHIRIE SEPTEMBRIE 2015',undefined,0,,2000.00,,,],
-    ['ref8',,,new Date(2015,8,1),'docType8','descr8',undefined,0,,26,,,],
     // 02.09.2015
     //[pattern   ,'Z:0157','FAE','INCASARI SERVICII'     ,    173.00,       ,],
     ['Z:0157',,,new Date(2015,8,2),'FAE','INCASARI SERVICII',undefined,1,,173.00,,,],
@@ -663,7 +666,7 @@ tests.set('importData', () => {
     //[pattern   ,15003905,'CHI','XEROX COLOTECH+ A4 90g/mp',       , 521.73,],
     [15003905,,,new Date(2015,8,2),'CHI','XEROX COLOTECH+ A4 90g/mp',undefined,0,,521.73,,,],
   ];
-
+  //v = 2;
   importData.verbosity = v;
   importData(...args);
   assert.deepStrictEqual(values, importData_newValues);
@@ -685,7 +688,6 @@ tests.set('importData', () => {
     ...Array(20).fill(Array(12)),
   ]
   //values = [];
-
 });
 
 tests.get('addMessages')();

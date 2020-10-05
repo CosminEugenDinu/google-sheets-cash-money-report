@@ -1050,18 +1050,30 @@ function importData(
     if (searchRecords.messages) addMessage(searchRecords.messages);
   }
 
-  if (!foundRecords.size)
-    v>0 && addMessage(
-      `No records found in spreadsheet ${srcSpreadsheets[0].getName()}`);
-  else
-    v>1 && addMessage(
-      `Found ${foundRecords.size} day-records in spreadsheets: [${srcSpreadsheets.map(ss => ss.getName())}]`);
-
-  
   // retrieve existing records in raw data sheet
   const existingRecords = getRecords(sheetToImportTo);
   v>1 && addMessage(`${existingRecords.size} day-records exists in ${sheetToImportTo.getName()}`);
 
+  if (!foundRecords.size)
+    v>0 && addMessage(
+      `No records found in spreadsheet ${srcSpreadsheets[0].getName()}`);
+  else {
+    v>1 && addMessage(
+      `Found ${foundRecords.size} day-records in spreadsheets: [${srcSpreadsheets.map(ss => ss.getName())}]`);
+  }
+  
+  v>1 && addMessage('appending data in raw data sheet...')
+  for (const [dateStr, record] of foundRecords){
+    if (existingRecords.has(dateStr))
+      existingRecords.get(dateStr).push(...record);
+    else
+      existingRecords.set(dateStr, record);
+  }
+
+/****************************************
+  // retrieve existing records in raw data sheet
+  const existingRecords = getRecords(sheetToImportTo);
+  v>1 && addMessage(`${existingRecords.size} day-records exists in ${sheetToImportTo.getName()}`);
   const dates = datesBetween(fromDate, toDate);
   v>1 && addMessage(`Searching found-records between ${new Date(fromDate).toLocaleDateString('ro-RO')} and ${new Date(toDate).toLocaleDateString('ro-RO')}...`);
 
@@ -1078,17 +1090,16 @@ function importData(
       existingRecords.set(dateStr, foundDateRecords);
     }
   }
-
   v>1 && addMessage('updating raw data sheet...')
+**********************************/
+
+
   const targetRange = sheetToImportTo.getRange('A1:F');
   const targetValues = targetRange.getValues();
+  const rangeLength = targetValues.length;
   const targetFieldNames = getFieldNames(targetValues[0]);
 
-  // delete all existing records
-  targetRange.clear();
-  v>1 && addMessage(`Deleted all 'A1:F' values from sheet ${sheetToImportTo.getName()}!`); 
   // writing new values
-
   const rawNewValues = []; 
   // copy field names
   rawNewValues.push(targetValues[0].map(elem=>elem));
@@ -1109,11 +1120,15 @@ function importData(
       }
     }
   );
+
+  // delete all existing records
+  targetRange.clear();
+  v>1 && addMessage(`Deleted all 'A1:F' values from sheet ${sheetToImportTo.getName()}!`); 
   
   v>1 && addMessage(`Writing new values...`);
 
   // expand rawNewValues to match existing range
-  const newToAdd = targetValues.length - rawNewValues.length;
+  const newToAdd = rangeLength - rawNewValues.length;
   for (let i=0; i<newToAdd; i++)
     rawNewValues.push(Array(targetValues[0].length));
   targetRange.setValues(rawNewValues);
