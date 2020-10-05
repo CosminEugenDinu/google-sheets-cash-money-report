@@ -1047,7 +1047,10 @@ function importData(
     for (const [dateStr, record] of searchRecords(sheet, identifierPattern)){
       foundRecords.set(dateStr, record);
     }
-    if (searchRecords.messages) addMessage(searchRecords.messages);
+    if (searchRecords.messages){
+      for (const [mes, count] of searchRecords.messages)
+        addMessage(mes);
+    }
   }
 
   // retrieve existing records in raw data sheet
@@ -1180,7 +1183,7 @@ function searchRecords(spreadsheet, identifierPattern, rowLim=50, colLim=6){
         });
         if (isValidRecord)  sheetRecords.push(record);
       } else {
-        addMessage(`Pattern not match`);
+        v>0 && addMessage(`Pattern not match`);
       }
     }
 
