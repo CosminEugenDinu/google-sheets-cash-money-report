@@ -2,7 +2,10 @@
 
 const assert = require('assert');
 const rewire = require('rewire');
+
 const Code = rewire('../../report_generator/Code.js');
+
+const Sheet = require('./sheet.js');
 
 
 const libraryGet = Code.__get__('libraryGet');
@@ -620,19 +623,48 @@ tests.set('importData', () => {
     getName(){return 'source_spreadsheet_name'},
   };
   const SpreadsheetApp = {openById(id){if(id===id1)return sourceSpreadsheet;}};
-
+/*****************************************
   let values = [];
   const targetRange = {
-    getValues(){return values;},
-    setValues(newValues){values = newValues;},
+    values,
+    getValues(){return this.values;},
+    setValues(newValues){
+      values = newValues;
+    },
     clear(){
       values.length = 0;
       return targetRange;},
   };
   const targetSheet = {
+    values,
+    targetRange,
     getName(){return 'target_sheet_name';},
-    getRange(){return targetRange;}
+    getRange(...args){
+      if (args.length === 1 && typeof args[0] === 'string')
+        return targetRange;
+      else if (args.length === 4){
+        const [row, col, numOfRows, numOfCols] = args;
+        const rangeValues = [];
+        for (let i=row-1; i < numOfRows; i++){
+          const rowValues = [];
+          for (let j=col-1; i < numOfCols; j++){
+            rowValues.push(this.values[i][j]);
+          }
+          rangeValues.push(rowValues);
+        }
+        targetRange.values = rangeValues;
+        return targetRange;
+      }
+    }
   };
+
+***************************************/
+  const targetSheet = new Sheet();
+  targetSheet.values = [
+    ['ref',,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
+    ['ref8',,new Date(2015,8,1),'docType8','descr8','unknown',0,,26,,,],
+    // after calling importData, this array should look like next importData_newValues
+  ];
 
   const fromDate=new Date(2015,8,1), toDate=new Date(2015,8,2);
   const company = ((company)=>{
@@ -645,11 +677,7 @@ tests.set('importData', () => {
   const args = [
     fromDate,toDate,company,dataLinks,identifierPattern,sheetToImportTo,SpreadsheetApp];
   
-  values = [
-    ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
-    ['ref8',,,new Date(2015,8,1),'docType8','descr8','unknown',0,,26,,,],
-    // after calling importData, this array should look like next importData_newValues
-  ];
+  /***********************
   const importData_newValues = [
     ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
     ['ref8',,,new Date(2015,8,1),'docType8','descr8',undefined,0,,26,,,],
@@ -666,28 +694,30 @@ tests.set('importData', () => {
     //[pattern   ,15003905,'CHI','XEROX COLOTECH+ A4 90g/mp',       , 521.73,],
     [15003905,,,new Date(2015,8,2),'CHI','XEROX COLOTECH+ A4 90g/mp',undefined,0,,521.73,,,],
   ];
+  *****************************/
+  const importData_newValues = [
+    ['ref',undefined,'date','doc_type','descr','strange_field','I_O_type',undefined,'value',undefined,undefined,],
+    ['ref8',undefined,new Date(2015,8,1),'docType8','descr8','unknown',0,undefined,26,undefined,undefined,],
+    // 01.09.2015
+    //[pattern   ,'Z:0156','FAE','INCASARI SERVICII'     ,    233.00,       ,],
+    ['Z:0156',undefined,new Date(2015,8,1),'FAE','INCASARI SERVICII',undefined,1,undefined,233.00,undefined,undefined,],
+    //[pattern   ,      10,'CHI','CHIRIE SEPTEMBRIE 2015',          ,2000.00,],
+    [10,undefined,new Date(2015,8,1),'CHI','CHIRIE SEPTEMBRIE 2015',undefined,0,undefined,2000.00,undefined,undefined,],
+    // 02.09.2015
+    //[pattern   ,'Z:0157','FAE','INCASARI SERVICII'     ,    173.00,       ,],
+    ['Z:0157',undefined,new Date(2015,8,2),'FAE','INCASARI SERVICII',undefined,1,undefined,173.00,undefined,undefined,],
+    //[pattern   ,      26,'FAE','IMPRUMUT NUMERAR'      ,    450.00,       ,],
+    [26,undefined,new Date(2015,8,2),'FAE','IMPRUMUT NUMERAR',undefined,1,undefined,450.00,undefined,undefined,],
+    //[pattern   ,15003905,'CHI','XEROX COLOTECH+ A4 90g/mp',       , 521.73,],
+    [15003905,undefined,new Date(2015,8,2),'CHI','XEROX COLOTECH+ A4 90g/mp',undefined,0,undefined,521.73,undefined,undefined,],
+  ];
   //v = 2;
   importData.verbosity = v;
+  //console.log(targetSheet.values);
   importData(...args);
-  assert.deepStrictEqual(values, importData_newValues);
-  v>0 && console.log(importData.messages);
-
-  values = [
-    ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
-    ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
-    ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
-    ...Array(5).fill(Array(12)),
-    ['ref8',,,new Date(2015,1,28),'docType8','descr7','unknown',0,,26,,,],
-    ['ref8',,,new Date(2016,1,27),'docType8','descr8','unknown',0,,26,,,],
-    ['ref8',,,new Date(2016,1,27),'docType8','descr8','unknown',0,,26,,,],
-    ...Array(20).fill(Array(12)),
-    ];
-  values = [
-    ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
-    ['ref8',,,new Date(2015,1,28),'docType8','descr8','unknown',0,,26,,,],
-    ...Array(20).fill(Array(12)),
-  ]
-  //values = [];
+  //console.log(targetSheet.getRange('A1:F').getValues());
+  assert.deepStrictEqual(targetSheet.getRange('A1:K').getValues(), importData_newValues);
+  //v>0 && console.log(importData.messages);
 });
 
 tests.get('addMessages')();
