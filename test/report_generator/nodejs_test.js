@@ -623,42 +623,6 @@ tests.set('importData', () => {
     getName(){return 'source_spreadsheet_name'},
   };
   const SpreadsheetApp = {openById(id){if(id===id1)return sourceSpreadsheet;}};
-/*****************************************
-  let values = [];
-  const targetRange = {
-    values,
-    getValues(){return this.values;},
-    setValues(newValues){
-      values = newValues;
-    },
-    clear(){
-      values.length = 0;
-      return targetRange;},
-  };
-  const targetSheet = {
-    values,
-    targetRange,
-    getName(){return 'target_sheet_name';},
-    getRange(...args){
-      if (args.length === 1 && typeof args[0] === 'string')
-        return targetRange;
-      else if (args.length === 4){
-        const [row, col, numOfRows, numOfCols] = args;
-        const rangeValues = [];
-        for (let i=row-1; i < numOfRows; i++){
-          const rowValues = [];
-          for (let j=col-1; i < numOfCols; j++){
-            rowValues.push(this.values[i][j]);
-          }
-          rangeValues.push(rowValues);
-        }
-        targetRange.values = rangeValues;
-        return targetRange;
-      }
-    }
-  };
-
-***************************************/
   const targetSheet = new Sheet();
   targetSheet.values = [
     ['ref',,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
@@ -677,24 +641,6 @@ tests.set('importData', () => {
   const args = [
     fromDate,toDate,company,dataLinks,identifierPattern,sheetToImportTo,SpreadsheetApp];
   
-  /***********************
-  const importData_newValues = [
-    ['ref',,,'date','doc_type','descr','strange_field','I_O_type',,'value',,,],
-    ['ref8',,,new Date(2015,8,1),'docType8','descr8',undefined,0,,26,,,],
-    // 01.09.2015
-    //[pattern   ,'Z:0156','FAE','INCASARI SERVICII'     ,    233.00,       ,],
-    ['Z:0156',,,new Date(2015,8,1),'FAE','INCASARI SERVICII',undefined,1,,233.00,,,],
-    //[pattern   ,      10,'CHI','CHIRIE SEPTEMBRIE 2015',          ,2000.00,],
-    [10,,,new Date(2015,8,1),'CHI','CHIRIE SEPTEMBRIE 2015',undefined,0,,2000.00,,,],
-    // 02.09.2015
-    //[pattern   ,'Z:0157','FAE','INCASARI SERVICII'     ,    173.00,       ,],
-    ['Z:0157',,,new Date(2015,8,2),'FAE','INCASARI SERVICII',undefined,1,,173.00,,,],
-    //[pattern   ,      26,'FAE','IMPRUMUT NUMERAR'      ,    450.00,       ,],
-    [26,,,new Date(2015,8,2),'FAE','IMPRUMUT NUMERAR',undefined,1,,450.00,,,],
-    //[pattern   ,15003905,'CHI','XEROX COLOTECH+ A4 90g/mp',       , 521.73,],
-    [15003905,,,new Date(2015,8,2),'CHI','XEROX COLOTECH+ A4 90g/mp',undefined,0,,521.73,,,],
-  ];
-  *****************************/
   const importData_newValues = [
     ['ref',undefined,'date','doc_type','descr','strange_field','I_O_type',undefined,'value',undefined,undefined,],
     ['ref8',undefined,new Date(2015,8,1),'docType8','descr8','unknown',0,undefined,26,undefined,undefined,],
@@ -715,9 +661,8 @@ tests.set('importData', () => {
   importData.verbosity = v;
   //console.log(targetSheet.values);
   importData(...args);
-  //console.log(targetSheet.getRange('A1:F').getValues());
   assert.deepStrictEqual(targetSheet.getRange('A1:K').getValues(), importData_newValues);
-  //v>0 && console.log(importData.messages);
+  v>0 && console.log(importData.messages);
 });
 
 tests.get('addMessages')();
