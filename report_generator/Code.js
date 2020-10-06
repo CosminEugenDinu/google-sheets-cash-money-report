@@ -1040,7 +1040,6 @@ function importData(
   } else {
     v>0 && addMessage(`Spreadsheets opened ${srcSpreadsheets.length}, [${srcSpreadsheets.map(ss => ss.getName())}]`);
   }
-
   const foundRecords = new Map(); 
   for (const sheet of srcSpreadsheets){
     searchRecords.verbosity = v;
@@ -1053,88 +1052,49 @@ function importData(
     }
   }
 
-  // retrieve existing records in raw data sheet
-  const existingRecords = getRecords(sheetToImportTo);
-  v>1 && addMessage(`${existingRecords.size} day-records exists in ${sheetToImportTo.getName()}`);
 
-  if (!foundRecords.size)
-    v>0 && addMessage(
-      `No records found in spreadsheet ${srcSpreadsheets[0].getName()}`);
-  else {
-    v>1 && addMessage(
-      `Found ${foundRecords.size} day-records in spreadsheets: [${srcSpreadsheets.map(ss => ss.getName())}]`);
-  }
-  
-  v>1 && addMessage('appending data in raw data sheet...')
-  for (const [dateStr, record] of foundRecords){
-    if (existingRecords.has(dateStr))
-      existingRecords.get(dateStr).push(...record);
-    else
-      existingRecords.set(dateStr, record);
-  }
-
-/****************************************
-  // retrieve existing records in raw data sheet
-  const existingRecords = getRecords(sheetToImportTo);
-  v>1 && addMessage(`${existingRecords.size} day-records exists in ${sheetToImportTo.getName()}`);
-  const dates = datesBetween(fromDate, toDate);
-  v>1 && addMessage(`Searching found-records between ${new Date(fromDate).toLocaleDateString('ro-RO')} and ${new Date(toDate).toLocaleDateString('ro-RO')}...`);
-
-  for (const dateStr of dates){
-    const foundDateRecords = foundRecords.get(dateStr);
-    const existingDateRecords = existingRecords.get(dateStr);
-    if (foundDateRecords && existingDateRecords){
-      v>0 && addMessage(`Duplicates found on date ${new Date(dateStr).toLocaleDateString('ro-RO')}.`);
-      v>1 && addMessage('resolving same-date-key conflicts...');
-      const mergedDateRecords = mergeDateRecords(foundDateRecords, existingDateRecords);
-
-      existingRecords.set(dateStr, mergedDateRecords);
-    } else if (foundDateRecords){
-      existingRecords.set(dateStr, foundDateRecords);
-    }
-  }
-  v>1 && addMessage('updating raw data sheet...')
-**********************************/
-
-
-  const targetRange = sheetToImportTo.getRange('A1:F');
+  const targetRange = sheetToImportTo.getRange('A1:J');
   const targetValues = targetRange.getValues();
   const rangeLength = targetValues.length;
   const targetFieldNames = getFieldNames(targetValues[0]);
 
   // writing new values
   const rawNewValues = []; 
-  // copy field names
-  rawNewValues.push(targetValues[0].map(elem=>elem));
-
-  const keyDates = Array.from(existingRecords.keys()).sort();
-  keyDates.forEach(
-    dateStr => {
-      for (const record of existingRecords.get(dateStr)){ 
-        const newRecord = Array(targetValues[0].length);
-        for (const fieldName in targetFieldNames){
-          const fieldIndex = targetFieldNames[fieldName];
-          if (fieldName === 'date')
-            newRecord[fieldIndex] = new Date(dateStr);
-          else
-            newRecord[fieldIndex] = record.get(fieldName);
-        }
-        rawNewValues.push(newRecord);
+  for (const [dateStr, records] of foundRecords){
+    for (const recordMap of records){
+      const newRecord = Array(targetValues[0].length);
+      for (const fieldName in targetFieldNames){
+        const fieldIndex = targetFieldNames[fieldName];
+        if (fieldName === 'date')
+          newRecord[fieldIndex] = new Date(dateStr);
+        else
+          newRecord[fieldIndex] = recordMap.get(fieldName);
       }
+      rawNewValues.push(newRecord);
     }
-  );
-
-  // delete all existing records
-  targetRange.clear();
-  v>1 && addMessage(`Deleted all 'A1:F' values from sheet ${sheetToImportTo.getName()}!`); 
+  }
+  
   
   v>1 && addMessage(`Writing new values...`);
 
-  // expand rawNewValues to match existing range
-  const newToAdd = rangeLength - rawNewValues.length;
-  for (let i=0; i<newToAdd; i++)
-    rawNewValues.push(Array(targetValues[0].length));
-  targetRange.setValues(rawNewValues);
+  // go back if last row is empty
+  let last = targetValues.length;
+  let isEmpty = true;
+  while (isEmpty){
+    -- last;
+    for (const fieldName in targetFieldNames){
+      const fieldIndex = targetFieldNames[fieldName];
+      if ( ! [NaN, null, undefined, ''].includes(targetValues[last][fieldIndex]))
+        isEmpty = false;
+    }
+  }
+
+  const fromRow = last+2; // last+1: last existing row (with values)j
+  const fromCol = 1;
+  const numOfRows = rawNewValues.length;
+  const numOfCols = rawNewValues[0].length;
+  const newTargetRange = sheetToImportTo.getRange(fromRow,fromCol,numOfRows,numOfCols);
+  newTargetRange.setValues(rawNewValues);
 
   v>0 && addMessage('Procedure importData END');
 } // importData END
