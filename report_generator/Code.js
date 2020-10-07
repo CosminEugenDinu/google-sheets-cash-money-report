@@ -646,6 +646,7 @@ function renderReport(
       if (this.type === 'target_element'){
         if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
         range.setValue(this.value);
+        range.setNumberFormat("0.00");
       }
       if (this.type === 'label_element'){
         if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
@@ -697,6 +698,7 @@ function renderReport(
       })();
 
       this.previous_balance = calculateBalance(this.prevDateStr);
+      this.previous_balance = Math.round((this.previous_balance + Number.EPSILON) * 100) / 100;
       
       // if balance is negative, that means you spent cash money you didn't collect
       if (this.previous_balance < 0){
@@ -927,6 +929,9 @@ function renderReport(
                 return dayTotal - recordValue;
           }, 0);
         }
+          /******************
+        return Math.round((total + Number.EPSILON) * 100) / 100;
+        ***********************/
         return total;
         }
       );
