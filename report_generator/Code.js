@@ -701,9 +701,12 @@ function renderReport(
       // if balance is negative, that means you spent cash money you didn't collect
       if (this.previous_balance < 0){
         const localPrevDate = new Date(this.prevDateStr).toLocaleDateString('ro-RO');
+        /*****************************
         throw new Error(
           `Previous day (${localPrevDate}) balance cannot be negative (${this.previous_balance}).`
         ); 
+        *****************************/
+        v>0 && addMessage(`WARNING ! Previous day (${localPrevDate}) balance is ${this.previous_balance}`);
       }
 
       const [total_input, total_day_output] = this.dayValues.reduce(
