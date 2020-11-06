@@ -43,4 +43,10 @@ echo "{\"scriptId\":\"$SCRIPT_ID\"}" > .clasp.json && echo "File .clasp.json cre
 # push local changes to google scripts
 clasp push
 ```
+- testing:
+```bash
+cd test
+npm install
+node nodejs_test.js
+```
 
