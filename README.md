@@ -20,4 +20,26 @@
 - done!
 
 ## Development - debugging:
-- Let's begin
+- requirements: GNU-Linux-distro, [nodejs](https://nodejs.org/), [npm](https://www.npmjs.com/get-npm/), [clasp](https://github.com/google/clasp)
+```bash
+(
+clasp login 
+# you will see `Default credentials saved to: ~/.clasprc.json (/home/user/.clasprc.json).` 
+git clone https://github.com/CosminEugenDinu/google-sheets-cash-money-report.git
+cd google-sheets-cash-money-report/src
+)
+```
+- go to https://script.google.com/home and select the project 
+- got to File -> Project properties -> Script ID -> you will copy this and paste it after running next script
+```bash
+(
+read -p "Paste here your Script ID:" SCRIPT_ID
+echo "{\"scriptId\":\"$SCRIPT_ID\"}" > .clasp.json
+)
+```
+- now you have a .clasp.json file with scriptId
+- push files to google:
+```bash
+clasp push
+```
+
