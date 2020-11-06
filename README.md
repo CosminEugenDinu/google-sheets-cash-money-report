@@ -55,3 +55,6 @@ node nodejs_test.js
 - how to use
 - how it works
 
+![Interface sheet](/docs/images/Interface.png)
+![Reports](/docs/images/Reports.png)
+
