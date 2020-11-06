@@ -3,7 +3,7 @@
 const assert = require('assert');
 const rewire = require('rewire');
 
-const Code = rewire('../../report_generator/Code.js');
+const Code = rewire('../../src/Code.js');
 
 const Sheet = require('./sheet.js');
 
