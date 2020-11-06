@@ -34,12 +34,13 @@ cd google-sheets-cash-money-report/src
 ```bash
 (
 read -p "Paste here your Script ID:" SCRIPT_ID
-echo "{\"scriptId\":\"$SCRIPT_ID\"}" > .clasp.json
+echo "{\"scriptId\":\"$SCRIPT_ID\"}" > .clasp.json && echo "File .clasp.json created!"
 )
 ```
 - now you have a .clasp.json file with scriptId
-- push files to google:
+- in order to push files to google, go to https://script.google.com/home/usersettings -> Google Apps Script API -> ON
 ```bash
+# push local changes to google scripts
 clasp push
 ```
 
