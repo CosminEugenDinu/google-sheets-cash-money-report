@@ -11,14 +11,12 @@ const getRecords = libraryGet('getRecords');
 const Log = libraryGet('Log');
 
 // global settings variables
-const REPORT_GENERATOR_SPREADSHEET_ID = "1nDNPcpgP9TlAcTSKASwFxuQQswdAI7Wm3I8Z-7rSGnE";
 const INTERFACE_SHEET_NAME = "Interface";
 const SETTINGS_SHEET_NAME = "settings";
 const RAWDATA_SHEET_SUFFIX = "_rawdata";
 
-
   
-const repGenSprSheet = SpreadsheetApp.openById(REPORT_GENERATOR_SPREADSHEET_ID);
+ const repGenSprSheet = SpreadsheetApp.getActiveSpreadsheet();
 
 // interfaceSheet is a {Sheet} with selects and button that triggers 'makeReport'
 const interfaceSheet = repGenSprSheet.getSheetByName(INTERFACE_SHEET_NAME);
