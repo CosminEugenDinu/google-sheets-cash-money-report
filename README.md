@@ -10,8 +10,8 @@
 - make sure you see your google email account in top-right of scripts page
 - to reveal "appsscript.json" go to View -> Show manifest file
 - on the left you will see two files: "Code.js" and "appsscript.json"
-- replace content of Code.js with [this_source_code](https://raw.githubusercontent.com/CosminEugenDinu/google-sheets-cash-money-report/master/src/Code.js?token=AIUO72HZW4QZBXJVQ6QDKYK7UU7PQ) and save it (Ctrl+S)
-- replace content of appsscript.json with [this_source_code](https://raw.githubusercontent.com/CosminEugenDinu/google-sheets-cash-money-report/master/src/appsscript.json?token=AIUO72GGV2Q3GOEJABET56S7UU5QO) and save it (Ctrl+S)
+- replace content of Code.js with [this_source_code](https://raw.githubusercontent.com/CosminEugenDinu/google-sheets-cash-money-report/master/src/Code.js) and save it (Ctrl+S)
+- replace content of appsscript.json with [this_source_code](https://raw.githubusercontent.com/CosminEugenDinu/google-sheets-cash-money-report/master/src/appsscript.json) and save it (Ctrl+S)
 - reports will be sent to a specific spreadsheet, like `Reports`. Let't create it. Go to [Google Sheets](https://docs.google.com/spreadsheets/u/0/), create it, then copy it's id. A spreadsheet ID can be extracted from its URL. For example, the spreadsheet ID in the URL https://docs.google.com/spreadsheets/d/abc1234567/edit#gid=0 is "abc1234567".
 - paste this id in spreadsheet `Copy of report-generator-template`, sheet `settings`, column `procedure.variable.value`, row `2`.
 - to run the script and generate reports, go to sheet `Interface` and click on *that* button (make sure you have selected a reasonable date range)
