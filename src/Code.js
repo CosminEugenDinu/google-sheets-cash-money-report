@@ -3,7 +3,7 @@
  * Main function, call from sheet button, where it is assigned
  * This function is considered global
  */
-
+// hi
 function main () {
 
 const Settings = libraryGet('settings');
@@ -359,7 +359,7 @@ function defaultTemplate(){
         target_element:{cell:[14,1]},
       },
       ref:{
-        target_element:{cell:[14,2]},
+        target_element:{cell:[14,2], value_type: 'string'},
       },
       doc_type:{
         target_element:{cell:[14,3]},
@@ -643,8 +643,9 @@ function renderReport(
       //range.clear();
       if (this.type === 'target_element'){
         if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
+        if (this.value_type == 'number') range.setNumberFormat("0.00");
+        if (this.value_type == 'string') range.setNumberFormat("@STRING@");
         range.setValue(this.value);
-        range.setNumberFormat("0.00");
       }
       if (this.type === 'label_element'){
         if (this.offset) sheet.getRange(...this.cell, ...this.offset).merge();
@@ -665,7 +666,7 @@ function renderReport(
   // assign class static variables
   Element._typesProps = new Map();
   Element._typesProps.set('target_element',
-    ['cell', 'offset', 'value', 'style']);
+    ['cell', 'offset', 'value', 'value_type', 'style']);
   Element._typesProps.set('label_element',
     ['cell', 'offset', 'value', 'style']);
   Element._typesProps.set('frame_element',
