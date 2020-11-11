@@ -353,7 +353,7 @@ function defaultTemplate(){
       style:LABEL_STYLE}},
     previous_balance:{
       label_element:{cell:[13,4], value:"SOLD LUNA/ZIUA PRECEDENTA"},
-      target_element:{cell:[13,5]}},
+      target_element:{cell:[13,5], value_type: 'number'}},
     record:{
       date:{
         target_element:{cell:[14,1]},
@@ -368,10 +368,11 @@ function defaultTemplate(){
         target_element:{cell:[14,4]},
       },
       input:{
-        target_element:{cell:[14,5]},
+        target_element:{cell:[14,5], value_type: 'number'},
       },
       output:{
         target_element:{cell:[14,6],
+          value_type: 'number',
         style: TARGET_STYLE},
       }
     },
@@ -381,16 +382,16 @@ function defaultTemplate(){
     },
     day_total_targets:{
       total_input:{
-        target_element:{cell:[15,5]}
+        target_element:{cell:[15,5], value_type: 'number'}
       },
       total_day_output:{
-        target_element:{cell:[15,6]}
+        target_element:{cell:[15,6], value_type: 'number'}
       }
     },
     day_balance:{
       label_element:{cell:[16,4],value:"Sold la data de {}:",
         style:LABEL_STYLE},
-      target_element:{cell:[16,5]}
+      target_element:{cell:[16,5], value_type: 'number'}
     },
     body:{
       frame_element:{cell:[13,1], extent:[4,6],
