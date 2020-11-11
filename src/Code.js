@@ -699,17 +699,6 @@ function renderReport(
 
       this.previous_balance = calculateBalance(this.prevDateStr);
       this.previous_balance = Math.round((this.previous_balance + Number.EPSILON) * 100) / 100;
-      
-      // if balance is negative, that means you spent cash money you didn't collect
-      if (this.previous_balance < 0){
-        const localPrevDate = new Date(this.prevDateStr).toLocaleDateString('ro-RO');
-        /*****************************
-        throw new Error(
-          `Previous day (${localPrevDate}) balance cannot be negative (${this.previous_balance}).`
-        ); 
-        *****************************/
-        v>0 && addMessage(`WARNING ! Previous day (${localPrevDate}) balance is ${this.previous_balance}`);
-      }
 
       const [total_input, total_day_output] = this.dayValues.reduce(
         (in_out, record) => {
@@ -725,6 +714,11 @@ function renderReport(
       this.total_input = total_input; 
       this.total_day_output = total_day_output; 
       this.day_balance = total_input - total_day_output;
+
+      // if balance is negative, that means you spent cash money you didn't collect
+      if (this.day_balance < 0){
+        v>0 && addMessage(`WARNING ! Current day (${this.date.toLocaleDateString('ro-RO')}) balance is ${this.day_balance}`);
+      }
     }
     
     setColumnWidths(sheet, widths){
