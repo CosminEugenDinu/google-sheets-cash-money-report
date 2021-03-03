@@ -1,5 +1,9 @@
 # Cash money daily reports generator
 ## Google Sheets apps script 
+This application has three main functions:
+- `importData` - parse old-formatted spreadsheet reports, identify data categories and intercalate them with current working data;
+- `cleanRawData` - efficient algorithm for data type checking (with predefined field validators), automatic type conversion, duplicates removal and sorting data records;
+- `renderReport` - validate records and creates daily report sheets (using a customizable json mini-template) for archiving or printing.
 
 ### Usage:
 - Open your Chromium based browser (Chrome)
