@@ -1,9 +1,10 @@
 # Cash money daily reports generator
-## Google Sheets apps script 
+The main purpose of this application is to facilitate recording and reporting cash money transactions.
 This application has three main functions:
 - `importData` - parse old-formatted spreadsheet reports, identify data categories and intercalate them with current working data;
 - `cleanRawData` - efficient algorithm for data type checking (with predefined field validators), automatic type conversion, duplicates removal and sorting data records;
 - `renderReport` - validate records and creates daily report sheets (using a customizable json mini-template) for archiving or printing.
+## Google Sheets apps script 
 
 ### Usage:
 - Open your Chromium based browser (Chrome)
